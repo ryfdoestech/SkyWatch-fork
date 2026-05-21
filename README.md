@@ -1,10 +1,13 @@
 # 📡 SkyWatch
 
-> A unified SDR monitoring dashboard. **Aircraft. Ships. Drones. Amateur radio. Weather satellites.** All on one map.
+> A unified SDR monitoring dashboard. **Aircraft and drones on one map.** Built on FastAPI + Leaflet, no build step.
 
 <p align="center">
-  <img src="docs/screenshots/dashboard-vessels.png" alt="SkyWatch dashboard with live vessels" width="90%"/>
+  <img src="docs/screenshots/dashboard-vessels.png" alt="SkyWatch dashboard" width="90%"/>
 </p>
+
+> [!IMPORTANT]
+> **v1.1.0 — UI scope trim + redesign.** The dashboard now surfaces **Aircraft (ADS-B) and Drones (Remote ID)** only. The AIS / APRS / NOAA modules below still live in the codebase ([skywatch/ais/](skywatch/ais/), [skywatch/aprs/](skywatch/aprs/), [skywatch/noaa/](skywatch/noaa/)) and accept CLI flags, but the sidebar tabs and Settings rows for them were removed pending a UX rework. The visual style was also overhauled — calmer dark surfaces, cyan accent bars, chip-style badges, flat primary buttons. To restore the AIS/APRS/NOAA UI later, revert the v1.1.0 changes to [skywatch/web/static/](skywatch/web/static/).
 
 <table>
 <tr>
@@ -86,6 +89,9 @@ Open **http://localhost:8080** → click ⚙ Settings → pick a module → **St
 ---
 
 ## 🧰 What you can monitor
+
+> [!NOTE]
+> As of v1.1.0 the **Aircraft** and **Drone Remote ID** sections below are the only ones surfaced in the dashboard. The others document Python modules that still ship in the codebase and respond to CLI flags / REST API calls, but have no UI tab right now.
 
 <details>
 <summary><strong>✈️ Aircraft (ADS-B 1090 MHz)</strong></summary>

@@ -13,9 +13,7 @@
         <h1>&#x1f4e1; SkyWatch</h1>
         <div id="stats">
             <span id="aircraft-count" class="badge aircraft">Aircraft: 0</span>
-            <span id="vessel-count" class="badge vessel">Vessels: 0</span>
             <span id="drone-count" class="badge drone">Drones: 0</span>
-            <span id="aprs-count" class="badge aprs">APRS: 0</span>
             <button id="setup-btn" class="badge setup-badge">Settings</button>
             <button id="clear-map-btn" class="badge clear-badge">Clear Map</button>
             <span id="connection-status" class="badge disconnected">Disconnected</span>
@@ -36,50 +34,50 @@
                 <div id="devices-error" class="hidden"></div>
                 <div id="devices-list" class="hidden"></div>
 
-                <div id="health-panel" style="margin-top:12px;padding:10px;border:1px solid #334155;border-radius:6px;background:#0f172a">
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                        <div style="flex:1;min-width:200px">
-                            <div style="font-weight:600;font-size:13px">Installation Status <span id="health-overall-badge" class="health-badge health-skip">checking…</span></div>
-                            <div id="health-summary" style="font-size:11px;color:#94a3b8;margin-top:3px">Verifying that every component is in place.</div>
+                <div id="health-panel">
+                    <div class="dw-panel-header">
+                        <div class="dw-panel-text">
+                            <div class="dw-panel-title">Installation Status <span id="health-overall-badge" class="health-badge health-skip">checking…</span></div>
+                            <div id="health-summary" class="dw-panel-sub">Verifying that every component is in place.</div>
                         </div>
                         <button id="health-refresh-btn" class="tx-btn-sm" type="button">Re-check</button>
                     </div>
-                    <div id="health-list" style="margin-top:8px;font-size:12px"></div>
+                    <div id="health-list" class="dw-panel-body"></div>
                 </div>
 
-                <div id="zadig-panel" class="hidden" style="margin-top:10px;padding:10px;border:1px solid #334155;border-radius:6px;background:#0f172a">
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                        <div style="flex:1;min-width:220px">
-                            <div style="font-weight:600;font-size:13px">USB driver helper (Zadig)</div>
-                            <div id="zadig-msg" style="font-size:12px;color:#94a3b8;margin-top:3px">Replace your RTL-SDR's driver with WinUSB so SkyWatch can talk to it.</div>
+                <div id="zadig-panel" class="hidden">
+                    <div class="dw-panel-header">
+                        <div class="dw-panel-text">
+                            <div class="dw-panel-title">USB driver helper (Zadig)</div>
+                            <div id="zadig-msg" class="dw-panel-sub">Replace your RTL-SDR's driver with WinUSB so SkyWatch can talk to it.</div>
                         </div>
                         <button id="zadig-launch-btn" class="tx-btn-sm" type="button">Install / Replace driver…</button>
                     </div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:8px;padding-top:8px;border-top:1px solid #1e293b;line-height:1.5">
-                        <strong style="color:#cbd5e1">To find your RTL-SDR in Zadig:</strong> click <em>Options</em> → enable <em>List All Devices</em>, then <em>uncheck</em> <em>Ignore Hubs or Composite Parents</em>. The dongle usually appears as <code style="background:#1e293b;padding:1px 4px;border-radius:3px">Blog V4</code> (or <code style="background:#1e293b;padding:1px 4px;border-radius:3px">Bulk-In, Interface (Interface 0)</code> on older units). Set the target driver to <strong>WinUSB</strong> and click <em>Replace Driver</em>.
+                    <div class="dw-panel-hint">
+                        <strong>To find your RTL-SDR in Zadig:</strong> click <em>Options</em> → enable <em>List All Devices</em>, then <em>uncheck</em> <em>Ignore Hubs or Composite Parents</em>. The dongle usually appears as <code>Blog V4</code> (or <code>Bulk-In, Interface (Interface 0)</code> on older units). Set the target driver to <strong>WinUSB</strong> and click <em>Replace Driver</em>.
                     </div>
                 </div>
 
-                <div id="vcredist-panel" class="hidden" style="margin-top:10px;padding:10px;border:1px solid #334155;border-radius:6px;background:#0f172a">
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                        <div style="flex:1;min-width:220px">
-                            <div style="font-weight:600;font-size:13px">Visual C++ Runtime (Microsoft Redistributable)</div>
-                            <div id="vcredist-msg" style="font-size:12px;color:#94a3b8;margin-top:3px">Required for AIS-catcher and several other bundled tools.</div>
+                <div id="vcredist-panel" class="hidden">
+                    <div class="dw-panel-header">
+                        <div class="dw-panel-text">
+                            <div class="dw-panel-title">Visual C++ Runtime (Microsoft Redistributable)</div>
+                            <div id="vcredist-msg" class="dw-panel-sub">Required for AIS-catcher and several other bundled tools.</div>
                         </div>
                         <button id="vcredist-launch-btn" class="tx-btn-sm" type="button">Install Visual C++ Runtime…</button>
                     </div>
                 </div>
 
-                <div id="npcap-panel" class="hidden" style="margin-top:10px;padding:10px;border:1px solid #334155;border-radius:6px;background:#0f172a">
-                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-                        <div style="flex:1;min-width:220px">
-                            <div style="font-weight:600;font-size:13px">WiFi capture driver (Npcap)</div>
-                            <div id="npcap-msg" style="font-size:12px;color:#94a3b8;margin-top:3px">Required for the WiFi-monitor-mode Drone Remote ID path. Bluetooth Drone-RID works without it.</div>
+                <div id="npcap-panel" class="hidden">
+                    <div class="dw-panel-header">
+                        <div class="dw-panel-text">
+                            <div class="dw-panel-title">WiFi capture driver (Npcap)</div>
+                            <div id="npcap-msg" class="dw-panel-sub">Required for the WiFi-monitor-mode Drone Remote ID path. Bluetooth Drone-RID works without it.</div>
                         </div>
                         <button id="npcap-launch-btn" class="tx-btn-sm" type="button">Install Npcap…</button>
                     </div>
-                    <div style="font-size:11px;color:#94a3b8;margin-top:8px;padding-top:8px;border-top:1px solid #1e293b;line-height:1.5">
-                        <strong style="color:#cbd5e1">In the Npcap installer:</strong> accept the license, leave the defaults checked (especially <em>Install Npcap in WinPcap API-compatible Mode</em> and <em>Support raw 802.11 traffic for wireless adapters</em>), click Install. After it finishes, restart SkyWatch and click <em>Re-check</em> above.
+                    <div class="dw-panel-hint">
+                        <strong>In the Npcap installer:</strong> accept the license, leave the defaults checked (especially <em>Install Npcap in WinPcap API-compatible Mode</em> and <em>Support raw 802.11 traffic for wireless adapters</em>), click Install. After it finishes, restart SkyWatch and click <em>Re-check</em> above.
                     </div>
                 </div>
 
@@ -182,10 +180,7 @@
             <div id="filter-bar">
                 <button class="filter-btn active" data-type="all">All</button>
                 <button class="filter-btn" data-type="aircraft">Aircraft</button>
-                <button class="filter-btn" data-type="vessel">Vessels</button>
                 <button class="filter-btn" data-type="drone">Drones</button>
-                <button class="filter-btn" data-type="aprs">APRS</button>
-                <button class="filter-btn" data-type="noaa">NOAA</button>
             </div>
 
             <!-- ADS-B Controls (visible when Aircraft tab is active) -->
@@ -201,42 +196,31 @@
                     <span id="adsb-db-status" style="font-size:11px;color:#64748b;flex:1">Aircraft DB: not loaded</span>
                     <button id="adsb-db-import" class="tx-btn-sm">Import Database</button>
                 </div>
-                <div class="alert-zones-section" style="margin-top:10px;border-top:1px solid #1e293b;padding-top:8px">
-                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                        <span style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px">Alert Zones</span>
+                <div class="alert-zones-section">
+                    <div class="dw-mini-section-header">
+                        <span class="dw-mini-section-title">Alert Zones</span>
                         <button id="alert-add-btn" class="tx-btn-sm">+ Add</button>
                     </div>
-                    <div id="alert-add-panel" style="display:none;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px;margin-bottom:6px">
-                        <div style="font-size:11px;color:#94a3b8;margin-bottom:6px">Click a point on the map to set the zone center.</div>
-                        <input id="alert-name" placeholder="Zone name" style="width:100%;margin-bottom:4px;padding:4px 6px;background:#020617;border:1px solid #334155;border-radius:4px;color:#e0e6ed;font-size:12px"/>
-                        <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center">
-                            <input id="alert-radius" type="number" min="0.5" step="0.5" value="5" style="width:60px;padding:4px 6px;background:#020617;border:1px solid #334155;border-radius:4px;color:#e0e6ed;font-size:12px"/>
-                            <span style="font-size:11px;color:#64748b">km radius</span>
+                    <div id="alert-add-panel" class="dw-inline-panel" style="display:none">
+                        <div class="dw-hint">Click a point on the map to set the zone center.</div>
+                        <input id="alert-name" class="tx-input dw-stack-input" placeholder="Zone name"/>
+                        <div class="dw-row-inline">
+                            <input id="alert-radius" type="number" min="0.5" step="0.5" value="5" class="tx-input" style="width:60px;flex:0 0 60px"/>
+                            <span class="dw-meta">km radius</span>
                         </div>
-                        <div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Trigger on (leave all unchecked = any aircraft):</div>
-                        <div id="alert-category-group" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;font-size:11px;color:#cbd5e1">
-                            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" value="military" class="alert-cat"/> Military</label>
-                            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" value="helicopter" class="alert-cat"/> Helicopter</label>
-                            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" value="mil-helo" class="alert-cat"/> Mil-helo</label>
+                        <div class="dw-hint">Trigger on (leave all unchecked = any aircraft):</div>
+                        <div id="alert-category-group" class="dw-checkrow">
+                            <label><input type="checkbox" value="military" class="alert-cat"/> Military</label>
+                            <label><input type="checkbox" value="helicopter" class="alert-cat"/> Helicopter</label>
+                            <label><input type="checkbox" value="mil-helo" class="alert-cat"/> Mil-helo</label>
                         </div>
-                        <input id="alert-callsign" placeholder="Callsign filter (optional)" style="width:100%;margin-bottom:6px;padding:4px 6px;background:#020617;border:1px solid #334155;border-radius:4px;color:#e0e6ed;font-size:12px"/>
-                        <div style="display:flex;gap:4px">
+                        <input id="alert-callsign" class="tx-input dw-stack-input" placeholder="Callsign filter (optional)"/>
+                        <div class="dw-row-inline">
                             <button id="alert-save" class="tx-btn-sm" style="flex:1" disabled>Save zone</button>
                             <button id="alert-cancel" class="tx-btn-sm" style="flex:1">Cancel</button>
                         </div>
                     </div>
-                    <div id="alert-zones-list" style="font-size:11px;color:#94a3b8"></div>
-                </div>
-            </div>
-
-            <!-- AIS Controls (visible when Vessels tab is active) -->
-            <div id="ais-controls" class="hidden">
-                <div class="adsb-device-row">
-                    <span class="module-icon vessel-color" style="font-size:16px">&#9981;</span>
-                    <select id="ais-device" class="device-select" style="flex:1">
-                        <option value="-1">Select Device</option>
-                    </select>
-                    <button class="module-toggle" data-module="ais" id="ais-toggle">Start</button>
+                    <div id="alert-zones-list" class="dw-list"></div>
                 </div>
             </div>
 
@@ -252,110 +236,16 @@
                     </select>
                     <button class="module-toggle" data-module="drone-wifi" id="drone-wifi-toggle">Start</button>
                 </div>
-                <div style="font-size:11px;color:#64748b;margin-top:2px;margin-bottom:6px">Adapter must support 802.11 monitor mode (e.g. Alfa AWUS036NHA/ACH).</div>
+                <div class="dw-hint">Adapter must support 802.11 monitor mode (e.g. Alfa AWUS036NHA/ACH).</div>
                 <div class="adsb-device-row" title="BLE scanner — uses host Bluetooth radio or USB BT dongle. Catches DJI Mini/Mavic/Air RID broadcasts.">
                     <span class="module-icon drone-color" style="font-size:14px">&#x1F4F6;</span>
-                    <span style="flex:1;color:#cbd5e1;font-size:12px">Bluetooth LE scanner (host BT radio)</span>
+                    <span class="dw-label-inline">Bluetooth LE scanner (host BT radio)</span>
                     <button class="module-toggle" data-module="drone-ble" id="drone-ble-toggle">Start</button>
                 </div>
-                <div id="drone-stats" style="font-size:11px;color:#64748b;margin-top:6px;padding:6px;background:#0f172a;border:1px solid #1e293b;border-radius:6px">Sniffer not running.</div>
-            </div>
-
-            <!-- APRS Controls (visible when APRS tab is active) -->
-            <div id="aprs-controls" class="hidden">
-                <div class="aprs-quick-actions">
-                    <button id="tx-beacon" class="module-toggle start" style="flex:1">Send Beacon</button>
-                    <button id="aprs-gear-btn" class="tx-btn-sm" title="APRS Settings" style="font-size:16px;padding:6px 10px" onclick="window.skywatch.openAPRSSettings()">&#9881;</button>
-                </div>
-                <div class="aprs-msg-row">
-                    <input type="text" id="tx-msg-to" class="tx-input" placeholder="Callsign" style="width:80px" />
-                    <input type="text" id="tx-msg-text" class="tx-input" placeholder="Message..." style="flex:1" />
-                    <button id="tx-send-msg" class="module-toggle start" style="min-width:50px">Send</button>
-                </div>
-                <div id="tx-status" style="padding:0 8px;min-height:14px;font-size:11px"></div>
-                <div id="aprs-messages">
-                    <div class="aprs-msg-header">
-                        <span>Messages</span>
-                        <span id="aprs-msg-count" class="tx-value">0</span>
-                    </div>
-                    <div id="aprs-msg-list"></div>
-                </div>
+                <div id="drone-stats" class="dw-status-line">Sniffer not running.</div>
             </div>
 
             <div id="target-list"></div>
-
-            <!-- APRS Settings Popup -->
-            <div id="aprs-settings-overlay" class="hidden" onclick="if(event.target===this)window.skywatch.closeAPRSSettings()">
-                <div id="aprs-settings-popup">
-                    <div class="modal-header" style="padding:10px 14px">
-                        <h2 style="font-size:14px">APRS Settings</h2>
-                        <button onclick="window.skywatch.closeAPRSSettings()">&times;</button>
-                    </div>
-                    <div style="padding:10px 14px">
-                        <div class="tx-row">
-                            <label>Callsign</label>
-                            <input type="text" id="tx-callsign" class="tx-input" placeholder="W1AW" style="width:90px" />
-                            <span style="font-size:11px;color:#64748b">-</span>
-                            <input type="number" id="tx-ssid" class="tx-input" placeholder="9" value="9" style="width:45px" min="0" max="15" />
-                            <button id="tx-save-call" class="tx-btn-sm">Save</button>
-                        </div>
-                        <div class="tx-row">
-                            <label>Position</label>
-                            <button id="tx-set-pos" class="tx-btn-sm">Set from map center</button>
-                            <span id="tx-pos-display" class="tx-value">Not set</span>
-                        </div>
-                        <div class="tx-row">
-                            <label>Symbol</label>
-                            <select id="tx-symbol" class="device-select" style="flex:1">
-                                <option value="/>">/> Car</option>
-                                <option value="/[">/[ Jogger</option>
-                                <option value="/b">/b Bicycle</option>
-                                <option value="/k">/k Truck</option>
-                                <option value="/v">/v Van</option>
-                                <option value="/Y">/Y Yacht</option>
-                                <option value="/:">/: Fire</option>
-                                <option value="/a">/a Ambulance</option>
-                                <option value="/-">/- House</option>
-                                <option value="/r">/r Repeater</option>
-                                <option value="/#">/# Digipeater</option>
-                                <option value="/I">/I TCP/IP</option>
-                            </select>
-                        </div>
-                        <div class="tx-row">
-                            <label>Comment</label>
-                            <input type="text" id="tx-comment" class="tx-input" placeholder="SkyWatch SDR Monitor" value="SkyWatch SDR Monitor" />
-                        </div>
-
-                        <h3 style="margin-top:12px;font-size:12px">Sources</h3>
-                        <div class="module-row">
-                            <div class="module-label">
-                                <span class="module-icon aprs-is-color">&#x1f4e1;</span>
-                                <span>APRS-IS</span>
-                            </div>
-                            <span class="module-note">Internet</span>
-                            <button class="module-toggle" data-module="aprs-is" id="aprs-is-toggle">Start</button>
-                        </div>
-                        <div class="module-row">
-                            <div class="module-label">
-                                <span class="module-icon aprs-rf-color">&#x1f4fb;</span>
-                                <span>APRS RF</span>
-                            </div>
-                            <select id="aprs-sdr-device" class="device-select">
-                                <option value="-1">Disabled</option>
-                            </select>
-                            <button class="module-toggle" data-module="aprs-sdr" id="aprs-sdr-toggle">Start</button>
-                        </div>
-                        <div class="module-row">
-                            <div class="module-label">
-                                <span class="module-icon aprs-uvpro-color">&#x1f4f1;</span>
-                                <span>UV-Pro</span>
-                            </div>
-                            <span class="module-note">-aprs-uvpro flag</span>
-                            <button class="module-toggle" data-module="aprs-uvpro" id="aprs-uvpro-toggle">Start</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <div id="detail-panel" class="hidden">
                 <button id="close-detail">&times;</button>

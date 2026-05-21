@@ -4,6 +4,9 @@ Welcome. This is the short version of SETUP.md aimed at getting you up and runni
 
 You don't need Python, pip, or any developer tooling. Everything is bundled.
 
+> [!IMPORTANT]
+> **v1.1.0** — the dashboard currently surfaces **Aircraft** and **Drones** only. The AIS / APRS / NOAA modules still ship inside the bundle and accept CLI flags, but the sidebar tabs and Settings rows for them were removed pending UI rework. References to them in this guide are kept for context but the click paths no longer apply.
+
 ---
 
 ## What you got
@@ -75,18 +78,16 @@ Open **http://localhost:8080** in your browser. You'll see the map dashboard.
 
 ### 4. Try a feature
 
-Click the gear icon (top-right) to open **Settings**. Each module has a **Start** button. Easy ones to try first:
+Click **Settings** (top-right) to open the panel. Each module has a **Start** button. The two surfaced in the v1.1.0 UI:
 
 | Feature | What you need | Where to click |
 |---|---|---|
-| Aircraft (OpenSky internet feed) | Nothing — works on any internet connection | Settings → Aircraft → **Online (OpenSky)** → Start |
-| Aircraft (your dongle) | RTL-SDR + ADS-B antenna | Settings → Aircraft → pick a Device → Start |
-| Vessels (your dongle) | RTL-SDR + 162 MHz antenna | Settings → Vessels → pick a Device → Start |
-| APRS (internet feed) | Nothing | Settings → APRS → **APRS-IS** → Start |
-| APRS (your dongle) | RTL-SDR + 2 m antenna | Settings → APRS → **APRS RF** → pick a Device → Start |
-| NOAA Weather Radio | RTL-SDR + 162 MHz antenna | NOAA tab → click a transmitter → Listen |
+| Aircraft (OpenSky internet feed) | Nothing — works on any internet connection | Aircraft tab → pick **Online (OpenSky)** → Start |
+| Aircraft (your dongle) | RTL-SDR + ADS-B antenna | Aircraft tab → pick a Device → Start |
+| Drones (Bluetooth LE Remote ID) | Built-in Bluetooth radio | Drones tab → **Bluetooth LE scanner** → Start |
+| Drones (WiFi monitor mode) | Compatible USB WiFi adapter + Npcap | Drones tab → pick the adapter → Start |
 
-Watch the map fill up. Use the tabs on the right to filter (All / Aircraft / Vessels / Drones / APRS / NOAA).
+Watch the map fill up. Use the tabs on the right side (All / Aircraft / Drones) to filter.
 
 ---
 
@@ -109,7 +110,7 @@ Add a one-line description: what you clicked, what you expected, what happened.
 | Browser says "can't connect to localhost:8080" | The console window probably crashed. Check the log in `logs\`. |
 | RTL-SDR Start button errors with "device not found" | You skipped the Zadig step (§2). Run Zadig and replace the driver. |
 | RTL-SDR Start button errors with `RTL-SDR #N is already in use` | Each dongle can only feed one module at a time. Stop the other module, or plug in a second dongle. |
-| ADS-B / AIS / APRS stays empty for 10+ minutes | Almost always antenna or location. Try the OpenSky online feed first to verify the dashboard is alive, then troubleshoot RF. |
+| ADS-B aircraft stays empty for 10+ minutes | Almost always antenna or location. Try the OpenSky online feed first to verify the dashboard is alive, then troubleshoot RF. |
 | `WARNING: missing VC++ Redistributable` | Open **Settings → Setup**; there's an Install button for it. |
 | Windows SmartScreen blocks an installer | Click **More info → Run anyway**. The bundled binaries aren't signed. |
 
@@ -123,9 +124,8 @@ When a new zip arrives, just **delete the old folder** and unzip the new one in 
 
 ## What this build CAN'T do (yet)
 
-- **APRS UV-Pro Bluetooth TNC** — button is there, decoder is stubbed.
+- **AIS vessels, APRS, NOAA Weather Radio** — UI tabs were removed in v1.1.0. The Python backends still ship (and respond to CLI flags) but there's no in-dashboard way to start them. Coming back in a future UI rework.
 - **Drone Remote ID over WiFi** — works, but requires Npcap (separate install) and a specific USB WiFi adapter (most laptops' built-in WiFi cards refuse). The Bluetooth-LE drone path works out of the box. See SETUP.md §6 if you want to try the WiFi path.
-- **APT image geometric correction** — captures look wavy. Cosmetic only.
 
 Everything else in the dashboard should work. If it doesn't, that's the feedback we want.
 

@@ -326,13 +326,16 @@
         ws.onmessage = function(evt) {
             try {
                 var data = JSON.parse(evt.data);
-                targets = data.targets || [];
-                aprsStations = data.aprs || [];
-                aprsMessages = data.messages || [];
+                // AIS, APRS and NOAA tabs were removed — drop their data at the
+                // source so nothing downstream renders vessels or APRS stations.
+                targets = (data.targets || []).filter(function(t) {
+                    return t.type !== 'vessel';
+                });
+                aprsStations = [];
+                aprsMessages = [];
                 if (data.alert_zones) handleAlertZonesPayload(data.alert_zones);
                 if (data.alert_events) handleAlertEventsPayload(data.alert_events);
                 updateAll();
-                if (activeFilter === 'aprs') updateAPRSMessages();
             } catch(e) {
                 console.error('Parse error:', e);
             }
@@ -353,20 +356,13 @@
     }
 
     function updateStats() {
-        let ac = 0, vs = 0, dr = 0;
+        let ac = 0, dr = 0;
         targets.forEach(function(t) {
             if (t.type === 'aircraft') ac++;
-            else if (t.type === 'vessel') vs++;
             else if (t.type === 'drone') dr++;
         });
         document.getElementById('aircraft-count').textContent = 'Aircraft: ' + ac;
-        document.getElementById('vessel-count').textContent = 'Vessels: ' + vs;
         document.getElementById('drone-count').textContent = 'Drones: ' + dr;
-        var visibleAPRS = aprsStations.filter(function(s) {
-            if (s.lat === 0 && s.lon === 0) return false;
-            return map.getBounds().contains([s.lat, s.lon]);
-        });
-        document.getElementById('aprs-count').textContent = 'APRS: ' + visibleAPRS.length;
     }
 
     function updateMap() {
@@ -624,17 +620,16 @@
 
     function buildTargetPopupHTML(t) {
         var title = t.callsign || t.ship_name || t.drone_id || t.id;
-        var header = '<div class="target-popup-header" style="font-weight:600;color:#e0e6ed;border-bottom:1px solid #1e293b;padding-bottom:6px;margin-bottom:6px">' +
-            escHtml(title) + ' <span style="color:#64748b;font-weight:400;font-size:11px">' + escHtml(t.type) + '</span></div>';
+        var header = '<div class="target-popup-header">' +
+            escHtml(title) + ' <span class="target-popup-kind">' + escHtml(t.type) + '</span></div>';
         var photoBlock = '';
         if (t.type === 'vessel' && t.ship_name) {
             var cached = vesselPhotoCache[t.ship_name];
             if (cached && cached.thumbnail) {
                 photoBlock =
                     '<a href="' + cached.page_url + '" target="_blank" rel="noopener">' +
-                    '<img src="' + cached.thumbnail + '" alt="' + escHtml(cached.title || t.ship_name) + '" ' +
-                    'style="max-width:100%;border-radius:6px;display:block;margin:0 0 6px"/></a>' +
-                    (cached.description ? '<div style="font-size:11px;color:#94a3b8;margin-bottom:6px">' + escHtml(cached.description) + '</div>' : '');
+                    '<img src="' + cached.thumbnail + '" alt="' + escHtml(cached.title || t.ship_name) + '" class="target-popup-thumb"/></a>' +
+                    (cached.description ? '<div class="target-popup-desc">' + escHtml(cached.description) + '</div>' : '');
             } else if (cached === undefined) {
                 vesselPhotoCache[t.ship_name] = null;
                 fetch('/api/vessel/photo?name=' + encodeURIComponent(t.ship_name))
@@ -650,7 +645,7 @@
                     .catch(function() {});
             }
         }
-        return '<div class="target-popup-body" style="font-size:12px;color:#cbd5e1;max-height:320px;overflow-y:auto">' +
+        return '<div class="target-popup-body">' +
             header + photoBlock + buildTargetDetailRows(t).join('') + '</div>';
     }
 
@@ -1712,7 +1707,7 @@
             var alerts = typeof data.alerts === 'string' ? JSON.parse(data.alerts) : data.alerts;
             var features = (alerts.features || []);
             if (features.length > 0) {
-                html += '<div class="nwr-section-title" style="color:#fca5a5">Active Alerts (' + features.length + ')</div>';
+                html += '<div class="nwr-section-title nwr-alerts-on">Active Alerts (' + features.length + ')</div>';
                 features.forEach(function(f) {
                     var p = f.properties || {};
                     var sevClass = 'nwr-alert-' + (p.severity || 'minor').toLowerCase();
@@ -1726,7 +1721,7 @@
                     '</div>';
                 });
             } else {
-                html += '<div class="nwr-section-title" style="color:#6ee7b7">No Active Alerts</div>';
+                html += '<div class="nwr-section-title nwr-alerts-off">No Active Alerts</div>';
             }
         }
 
@@ -1777,17 +1772,8 @@
         });
     };
 
-    // Load towers on startup — show at zoom level 4+
-    loadNWRTowers();
-    map.on('zoomend', function() {
-        if (map.getZoom() >= 8) {
-            if (!map.hasLayer(nwrTowerLayer)) map.addLayer(nwrTowerLayer);
-        } else {
-            if (map.hasLayer(nwrTowerLayer)) map.removeLayer(nwrTowerLayer);
-        }
-    });
-    // Initial visibility check
-    if (map.getZoom() < 8) map.removeLayer(nwrTowerLayer);
+    // NOAA tab removed — skip loading NWR transmitter towers so they don't
+    // appear on the map without a way to interact with them.
 
     // ══════════════════════════════════════
     // ── NOAA Satellite Tab ──
@@ -1827,7 +1813,7 @@
         html += '<div class="noaa-ctrl-row" style="margin-top:6px">' +
             '<button id="nwr-listen" class="noaa-btn">Listen</button>' +
             '<button id="nwr-stop" class="noaa-btn noaa-btn-stop" style="display:none">Stop</button>' +
-            '<button id="nwr-scan" class="noaa-btn" style="background:#1e293b;color:#94a3b8">Scan All</button>' +
+            '<button id="nwr-scan" class="noaa-btn noaa-btn-secondary">Scan All</button>' +
         '</div>';
         html += '<div id="nwr-status-line" style="margin-top:6px;font-size:11px;color:#64748b"></div>';
         html += '<audio id="nwr-audio" style="display:none" autoplay></audio>';
