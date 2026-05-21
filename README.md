@@ -6,51 +6,25 @@
   <img src="docs/screenshots/dashboard-vessels.png" alt="SkyWatch dashboard" width="90%"/>
 </p>
 
-> [!IMPORTANT]
-> **v1.1.0 — UI scope trim + redesign.** The dashboard now surfaces **Aircraft (ADS-B) and Drones (Remote ID)** only. The AIS / APRS / NOAA modules below still live in the codebase ([skywatch/ais/](skywatch/ais/), [skywatch/aprs/](skywatch/aprs/), [skywatch/noaa/](skywatch/noaa/)) and accept CLI flags, but the sidebar tabs and Settings rows for them were removed pending a UX rework. The visual style was also overhauled — calmer dark surfaces, cyan accent bars, chip-style badges, flat primary buttons. To restore the AIS/APRS/NOAA UI later, revert the v1.1.0 changes to [skywatch/web/static/](skywatch/web/static/).
-
 <table>
 <tr>
-<td align="center" width="33%">
+<td align="center" width="50%">
 
-### ✈️ Aircraft
-RTL-SDR + `readsb`<br/>or OpenSky online
-
-</td>
-<td align="center" width="33%">
-
-### 🚢 Ships
-RTL-SDR + AIS-catcher<br/>or aisstream.io online
+### ✈️ Aircraft (ADS-B 1090 MHz)
+RTL-SDR + pure-Python decoder (or `readsb`)<br/>or OpenSky online
 
 </td>
-<td align="center" width="33%">
+<td align="center" width="50%">
 
-### 🛸 Drones
-ASTM F3411 — WiFi<br/>+ Bluetooth LE
-
-</td>
-</tr>
-<tr>
-<td align="center">
-
-### 📻 APRS
-On-air via `rtl_fm` + `multimon-ng`<br/>or APRS-IS internet feed
-
-</td>
-<td align="center">
-
-### 🛰️ NOAA Satellites
-NOAA-15 / 18 / 19<br/>SGP4 + APT capture
-
-</td>
-<td align="center">
-
-### 🌩️ NOAA Weather Radio
-All 7 NWR channels<br/>live in your browser
+### 🛸 Drones (Remote ID)
+ASTM F3411 over Bluetooth LE<br/>+ WiFi monitor mode
 
 </td>
 </tr>
 </table>
+
+> [!NOTE]
+> **v1.1.0** — the dashboard was trimmed to Aircraft + Drones and visually overhauled (DroneWatch-inspired dark palette, cyan accent bars, chip-style badges, flat primary buttons). The AIS / APRS / NOAA Python modules still ship in the codebase ([skywatch/ais/](skywatch/ais/), [skywatch/aprs/](skywatch/aprs/), [skywatch/noaa/](skywatch/noaa/)) and accept their existing CLI flags — see [Backend-only modules](#-backend-only-modules-no-ui-as-of-v110) below — they just have no in-dashboard Start button right now.
 
 ---
 
@@ -84,34 +58,23 @@ python -m skywatch -addr :8080
 Open **http://localhost:8080** → click ⚙ Settings → pick a module → **Start**.
 
 > [!NOTE]
-> **No hardware?** No problem. Click **Settings → Aircraft → Online (OpenSky)** and you'll see live aircraft the moment the map renders. APRS-IS, OpenSky, AISStream, and weather.gov all work without any radio.
+> **No hardware?** No problem. Pick the **Aircraft** tab in the sidebar, choose **Online (OpenSky)** in the device dropdown, and click **Start** — live aircraft appear the moment the map renders.
 
 ---
 
-## 🧰 What you can monitor
+## 🧰 What's in the dashboard
 
-> [!NOTE]
-> As of v1.1.0 the **Aircraft** and **Drone Remote ID** sections below are the only ones surfaced in the dashboard. The others document Python modules that still ship in the codebase and respond to CLI flags / REST API calls, but have no UI tab right now.
-
-<details>
+<details open>
 <summary><strong>✈️ Aircraft (ADS-B 1090 MHz)</strong></summary>
 
 - **RF mode:** RTL-SDR dongle + a 1090 MHz antenna. Pure-Python decoder built in (no `readsb` install required) — `readsb` is supported as an alternative via `-readsb`.
 - **Online mode:** OpenSky Network. Free tier rate-limited to ~400 calls/day; the dashboard polls only your visible map view to stretch the budget.
 - **Database:** Aircraft type / registration / operator lookup. Importable from OpenSky in Settings.
+- **Alert zones:** Drop a radius on the map and get a push notification when a new aircraft enters (filterable by military / helicopter / callsign).
 
 </details>
 
-<details>
-<summary><strong>🚢 Ships (AIS 162 MHz)</strong></summary>
-
-- **RF mode:** RTL-SDR + `rtl_ais` (Linux/macOS) or **AIS-catcher** (the Windows-friendly drop-in, pre-built binaries). Auto-detected at startup.
-- **Online mode:** [aisstream.io](https://aisstream.io) WebSocket feed. Free API key needed.
-- Ship name, type, MMSI country, dimensions, draught, ETA, destination — all parsed from AIS message types 1/2/3/5/18.
-
-</details>
-
-<details>
+<details open>
 <summary><strong>🛸 Drone Remote ID (ASTM F3411)</strong></summary>
 
 Catches drones broadcasting their identity and position. **Two independent radio bands**, either is enough to put a drone on the map:
@@ -121,19 +84,35 @@ Catches drones broadcasting their identity and position. **Two independent radio
 
 </details>
 
+---
+
+## 🧪 Backend-only modules (no UI as of v1.1.0)
+
+The Python modules below still ship in the codebase and accept their existing CLI flags. They speak the same REST + WebSocket protocol they always did — a custom client can still drive them — but the dashboard's sidebar tabs and Settings rows for them were removed in v1.1.0 pending a UX rework.
+
 <details>
-<summary><strong>📻 APRS (Amateur Packet Radio)</strong></summary>
+<summary><strong>🚢 Ships (AIS 162 MHz) — backend only</strong></summary>
+
+- **RF mode:** RTL-SDR + `rtl_ais` (Linux/macOS) or **AIS-catcher** (the Windows-friendly drop-in, pre-built binaries). Auto-detected at startup.
+- **Online mode:** [aisstream.io](https://aisstream.io) WebSocket feed. Free API key needed.
+- Ship name, type, MMSI country, dimensions, draught, ETA, destination — all parsed from AIS message types 1/2/3/5/18.
+- Start via `-ais-device N` or `-aisstream-key KEY`.
+
+</details>
+
+<details>
+<summary><strong>📻 APRS (Amateur Packet Radio) — backend only</strong></summary>
 
 Two independent receive paths plus an internet TX path:
 
 - **APRS-IS** (internet) — `rotate.aprs2.net`, filtered by lat/lon/radius. Receive everywhere; transmit beacons / messages / status with your callsign + APRS-IS passcode.
 - **APRS RF** (off-air) — `rtl_fm` + `multimon-ng` chain decodes Bell-202 AFSK1200 + HDLC + AX.25 from your RTL-SDR on 144.390 MHz (US) / 144.800 MHz (EU). See [SETUP.md §6.5](SETUP.md#65-aprs-rf-rtl_fm--multimon-ng).
-- Stations are tagged in the UI with their source (🌐 IS / 📡 RF) so you can tell internet-relayed packets from ones you actually heard.
+- Start via `-aprs-is` (plus `-aprs-call`, `-aprs-pass`, `-aprs-lat/lon/radius`).
 
 </details>
 
 <details>
-<summary><strong>🛰️ NOAA Weather Satellites</strong></summary>
+<summary><strong>🛰️ NOAA Weather Satellites — backend only</strong></summary>
 
 - **Tracking:** SGP4 + Celestrak TLEs. Predicts NOAA-15 / 18 / 19 passes for your observer location.
 - **APT capture:** RTL-SDR + `rtl_fm` records the 137 MHz transmission, recovers sync, and renders the grayscale image. Geometric correction (Doppler / earth-curvature) is on the roadmap.
@@ -141,11 +120,11 @@ Two independent receive paths plus an internet TX path:
 </details>
 
 <details>
-<summary><strong>🌩️ NOAA Weather Radio + weather.gov</strong></summary>
+<summary><strong>🌩️ NOAA Weather Radio + weather.gov — backend only</strong></summary>
 
-- **NWR live audio** — listen to all 7 NWR channels (162.4 – 162.55 MHz) directly in the browser. Scan all 7 with one click.
-- **NWR transmitter map** — every NWR transmitter location overlaid on the map.
-- **weather.gov** — pulls active alerts and forecasts for the visible map area.
+- **NWR live audio** — REST endpoints stream any of the 7 NWR channels (162.4 – 162.55 MHz). The browser audio player UI was removed in v1.1.0; the `/api/noaa/radio/*` endpoints still work.
+- **NWR transmitter map** — every NWR transmitter location is still in [data/nwr_stations.csv](data/nwr_stations.csv) and exposed via `/api/noaa/radio/stations`; the Leaflet overlay was removed.
+- **weather.gov** — `/api/noaa/weather?lat=&lon=` still returns active alerts and forecasts.
 
 </details>
 
@@ -153,16 +132,24 @@ Two independent receive paths plus an internet TX path:
 
 ## 📦 What runs where
 
+**In the dashboard:**
+
 | Capability | 🐧 Linux | 🍎 macOS | 🪟 Windows |
 |---|:---:|:---:|:---:|
 | ADS-B (RF) | ✅ | ✅ | ✅ (WinUSB via Zadig) |
+| OpenSky online aircraft | ✅ | ✅ | ✅ |
+| Drone RID — Bluetooth LE | ✅ | ✅ | ✅ |
+| Drone RID — WiFi monitor mode | ✅ | ✅ * | ⚠️ Npcap **and** a compatible chipset — see [§6](SETUP.md#6-drone-remote-id) |
+
+**Backend-only modules (CLI flags / REST API; no UI as of v1.1.0):**
+
+| Capability | 🐧 Linux | 🍎 macOS | 🪟 Windows |
+|---|:---:|:---:|:---:|
 | AIS (RF) | ✅ | ✅ | ✅ (WinUSB via Zadig) |
-| OpenSky / aisstream.io | ✅ | ✅ | ✅ |
+| aisstream.io online vessels | ✅ | ✅ | ✅ |
 | NOAA satellite tracking | ✅ | ✅ | ✅ |
 | NOAA APT capture (`rtl_fm`) | ✅ | ✅ | ✅ |
 | NOAA Weather Radio (`rtl_fm`) | ✅ | ✅ | ✅ |
-| Drone RID — Bluetooth LE | ✅ | ✅ | ✅ |
-| Drone RID — WiFi monitor mode | ✅ | ✅ * | ⚠️ Npcap **and** a compatible chipset — see [§6](SETUP.md#6-drone-remote-id) |
 | APRS-IS gateway | ✅ | ✅ | ✅ |
 | APRS RF (`rtl_fm` + `multimon-ng`) | ✅ | ✅ | ✅ |
 | weather.gov forecasts/alerts | ✅ | ✅ | ✅ |
@@ -173,7 +160,7 @@ Two independent receive paths plus an internet TX path:
 
 ## 🗺️ How online feeds bound their queries
 
-The dashboard sends the visible map bounds with every `/api/start` and on every pan/zoom (debounced **500 ms** for ADS-B, **2 s** for AIS). OpenSky polls only that bounding box, clamped to its 20°×30° free-tier limit. AISStream re-subscribes only when the box has shifted by ≥0.5° (the same threshold the original Go version used to avoid spamming aisstream.io with rapid resubs).
+The dashboard sends the visible map bounds with every `/api/start` and on every pan/zoom (debounced **500 ms** for ADS-B). OpenSky polls only that bounding box, clamped to its 20°×30° free-tier limit. The AISStream backend uses the same pattern (re-subscribes only when the box shifts ≥0.5°) for callers that drive it via the REST API.
 
 ---
 
@@ -265,15 +252,19 @@ SkyWatch started as a PyQt desktop app, was rewritten in Go for headless server 
 
 ---
 
-## 🚧 What's deferred to v2
+## 🚧 What's deferred
 
-The Go version had a few subsystems that are heavier ports. Their web API surfaces work — the dashboard just doesn't get RF-side decodes from these yet:
+UI / UX rework:
+
+- **AIS / APRS / NOAA tabs.** Backend modules ship and work; the dashboard's sidebar tabs, Settings rows, and detail panels for them were pulled in v1.1.0 pending a redesign.
+
+Backend gaps inherited from the Go version:
 
 - **APRS UV-Pro Bluetooth TNC.** TX path through APRS-IS works; UV-Pro KISS framing is stubbed.
 - **APT image geometric correction.** Capture + sync detection + grayscale image work; Doppler / earth-curvature correction is on the roadmap.
 
 > [!NOTE]
-> **APRS RF demod was on this list — it's now shipping.** Bell-202 AFSK + HDLC + AX.25 decoded via the `rtl_fm | multimon-ng` chain. See [SETUP.md §6.5](SETUP.md#65-aprs-rf-rtl_fm--multimon-ng).
+> **APRS RF demod was on this list — it's now shipping** (backend only as of v1.1.0). Bell-202 AFSK + HDLC + AX.25 decoded via the `rtl_fm | multimon-ng` chain. See [SETUP.md §6.5](SETUP.md#65-aprs-rf-rtl_fm--multimon-ng).
 
 ---
 
