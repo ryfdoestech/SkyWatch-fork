@@ -267,6 +267,41 @@ Bluetooth LE
 
 You can sanity-check the parser without flying anything by installing the **Open Drone ID** Android app, which broadcasts a synthetic RID over both bands.
 
+### 6.4 Second BT radio: Realtek RTL8761B via WinUSB
+
+The Bluetooth LE path in §6.0 uses the host's onboard Bluetooth radio through the Microsoft Bluetooth stack (`bthport.sys`). Windows only lets **one BT radio bind to that stack at a time**, so plugging in a USB Bluetooth dongle while the onboard radio is alive normally just gives you a Code 31 ("device cannot start") error — Windows refuses to add a second one.
+
+SkyWatch ships an alternate path that talks to a Realtek RTL8761B(U) USB dongle **directly over WinUSB / libusb**, bypassing the OS Bluetooth stack entirely. This lets the dongle run *alongside* the onboard radio with no driver conflict — the two scan independently, both feed the same drone-target list, and you get extra antenna coverage for the cost of one cheap dongle (~$10 from Amazon for a generic "USB Bluetooth 5.3 Adapter").
+
+**What's compatible:** any USB dongle whose chipset reports VID `0x2C0A` PID `0x8761` (Realtek RTL8761BU). This covers most of the bargain-bin "USB Bluetooth 5.0/5.1/5.3" dongles sold under house brands.
+
+**One-time setup:**
+
+1. Plug the Realtek dongle in. Confirm it shows up as "Realtek Bluetooth 5.x Adapter" in Device Manager (it'll be in Code 31 / yellow-bang state alongside the onboard radio — that's normal and what we're fixing).
+2. Launch `tools\win64\zadig.exe`.
+3. **Options → List All Devices.**
+4. From the dropdown pick the entry whose **USB ID field reads `2C0A 8761`**. Triple-check this — Zadig is happy to break your Intel/Killer/Broadcom onboard BT radio if you point it at the wrong device. **Description "Realtek Bluetooth 5.3 Adapter"** is the right one.
+5. Target driver: **WinUSB**. Click **Replace Driver**.
+6. The dongle now disappears from Device Manager's Bluetooth section and reappears under "Universal Serial Bus devices" (or similar). The Code 31 conflict with the onboard radio is gone.
+
+**Verify in SkyWatch:**
+
+A third row appears in the Drones tab: **"Bluetooth LE — Realtek dongle (WinUSB)"**. Click Start. The console should log, in order:
+
+```
+loaded firmware (42088 bytes) + config (6 bytes) from .../tools/win64
+RTL8761BU ROM version: 0x00            (or 0x01, depends on chip revision)
+selected patch subsection: 14048 bytes
+uploading 14054 bytes in 56 chunks of up to 252 bytes
+firmware download complete; controller resetting
+HCI LE scan running on Realtek dongle
+HCI scan: N adv frames (M Drone-RID)   (every 15 s)
+```
+
+**Reversing the Zadig swap:** Open Device Manager → find the dongle under "Universal Serial Bus devices" → right-click → Uninstall device → check "Delete the driver software for this device" → OK → unplug + replug. Windows will reinstall the generic Bluetooth USB driver and the dongle becomes a normal BT radio again (but you're back to the Code 31 conflict with the onboard radio).
+
+**Internals (for the curious):** SkyWatch reads the RTL8761B's ROM version via vendor HCI command `FC6D`, walks the bundled v1 "Realtech" epatch firmware blob (`rtl_bt/rtl8761bu_fw.bin` from the Linux firmware tree), picks the patch entry matching the ROM revision, stamps the SVN slot, and uploads it in 252-byte chunks via vendor command `FC20`. Then standard HCI: Reset, Set_Event_Mask, LE_Set_Scan_Parameters (active scan, 30 ms window in a 30 ms interval), LE_Set_Scan_Enable. Advertising Reports are extracted from interrupt-IN events, AD structures walked for Service Data with UUID `0xFFFA`, and the resulting bytes are fed into the same `_apply_message` parser the bleak and WiFi paths use. The whole thing is `pyusb` + `libusb-1.0.dll` — no Realtek SDK, no kernel driver. See [skywatch/remoteid/ble_hci.py](skywatch/remoteid/ble_hci.py).
+
 ---
 
 ## 6.5. APRS RF — `rtl_fm` + `multimon-ng`

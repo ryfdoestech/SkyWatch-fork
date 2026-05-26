@@ -33,6 +33,7 @@ class BLEScanner:
         self._task: Optional[asyncio.Task] = None
         self._scanner = None
         self._states: dict[str, _DroneState] = {}
+        self._dbg_seen: set = set()
         # Visible counters so the dashboard can show "BLE adv frames seen".
         self.frames_total = 0
         self.frames_rid = 0
@@ -108,26 +109,50 @@ class BLEScanner:
             self._scanner = None
 
     def _handle_payload(self, addr: str, payload: bytes, loop: asyncio.AbstractEventLoop) -> None:
-        # ASTM F3411 BLE prepends a 1-byte advertisement counter; the rest
-        # is the same Open Drone ID message body we already parse for WiFi.
-        if len(payload) < 2:
+        # Standard ASTM F3411 BLE 4 framing is 1-byte msg counter + 25-byte
+        # ODID (26 total). Some beacons (e.g. ESP32-based DIY RID modules)
+        # prepend an extra 1-byte marker, giving 27 total. Dispatch on length
+        # so both work.
+        n = len(payload)
+        if n >= 27:
+            body = payload[2:]
+        elif n >= 26:
+            body = payload[1:]
+        elif n >= 25:
+            body = payload  # counter already stripped by the host stack
+        else:
             return
-        body = payload[1:]
         self.frames_rid += 1
         self.last_rid_at = time.time()
         state = self._states.setdefault(addr, _DroneState())
+        parsed_types: list[int] = []
         for msg_type, sub in parse_remote_id_ie(body):
-            ready = _apply_message(state, msg_type, sub)
-            if ready:
-                target = Target(
-                    id=f"DRONE-{state.uas_id}",
-                    type=TYPE_DRONE,
-                    callsign=state.uas_id,
-                    drone_id=state.uas_id,
-                    operator=state.operator_id,
-                    lat=state.lat, lon=state.lon,
-                    altitude=state.altitude_m,
-                    speed=state.speed_kt,
-                    heading=state.heading,
-                )
-                asyncio.run_coroutine_threadsafe(self.tracker.upsert(target), loop)
+            parsed_types.append(msg_type)
+            _apply_message(state, msg_type, sub)
+        # Debug: log first frame of each previously-unseen (addr, msg_type)
+        # combination. Gives us one sample of every ODID message type the
+        # beacon ever sends, without flooding when it broadcasts continuously.
+        seen_key = (addr, tuple(parsed_types))
+        if seen_key not in self._dbg_seen and len(self._dbg_seen) < 30:
+            self._dbg_seen.add(seen_key)
+            log.info("BLE RID debug addr=%s payload_len=%d payload=%s parsed_types=%s state.uas_id=%r state.lat=%s state.lon=%s state.alt=%s",
+                     addr, len(payload), payload.hex(), parsed_types,
+                     state.uas_id, state.lat, state.lon, state.altitude_m)
+        # Publish as soon as we have a position. Always key on BLE MAC so a
+        # beacon broadcasting both serial (IDType=1) and CAA registration
+        # (IDType=2) Basic-IDs doesn't produce two separate targets.
+        if state.lat or state.lon:
+            mac = addr.replace(":", "")
+            target = Target(
+                id=f"DRONE-{mac}",
+                type=TYPE_DRONE,
+                callsign=state.uas_id or state.registration or mac,
+                drone_id=state.uas_id,
+                registration=state.registration,
+                operator=state.operator_id,
+                lat=state.lat, lon=state.lon,
+                altitude=state.altitude_m,
+                speed=state.speed_kt,
+                heading=state.heading,
+            )
+            asyncio.run_coroutine_threadsafe(self.tracker.upsert(target), loop)

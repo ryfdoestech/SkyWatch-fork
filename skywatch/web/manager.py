@@ -16,7 +16,7 @@ from ..adsb import ADSB, ADSBConfig, OpenSky, OpenSkyConfig, NativeADSB, NativeA
 from ..ais import AIS, AISConfig, AISStream, AISStreamConfig
 from ..aprs import APRSStore, APRSISClient, APRSISConfig, APRSRF, APRSRFConfig
 from ..noaa import NOAATracker, NWRReceiver, APTCapture, APTConfig, CaptureResult
-from ..remoteid import RemoteID, RemoteIDConfig, BLEScanner
+from ..remoteid import RemoteID, RemoteIDConfig, BLEScanner, HCIScanner, find_hci_dongle
 
 log = logging.getLogger("skywatch.manager")
 
@@ -55,6 +55,10 @@ class Manager:
         self.aprs_rf: Optional[APRSRF] = None
         self.remoteid: Optional[RemoteID] = None
         self.remoteid_ble: Optional[BLEScanner] = None
+        # HCI/WinUSB scanner for a Realtek RTL8761B(U) dongle. Runs alongside
+        # remoteid_ble — Windows's BT stack and our raw-USB path don't share
+        # state, so you can scan with both radios simultaneously.
+        self.remoteid_hci: Optional[HCIScanner] = None
         # Remember the WiFi interface passed via CLI so the dashboard's
         # Start/Stop button can restart drone-RID without needing to re-type it.
         self.remoteid_interface: str = ""
@@ -132,11 +136,16 @@ class Manager:
             ModuleStatus(name="drone-ble",
                          enabled=self.remoteid_ble is not None,
                          running=bool(self.remoteid_ble and self.remoteid_ble._task and not self.remoteid_ble._task.done())),
+            ModuleStatus(name="drone-ble-hci",
+                         enabled=self.remoteid_hci is not None,
+                         running=bool(self.remoteid_hci and self.remoteid_hci.running)),
             ModuleStatus(name="drone",
-                         enabled=self.remoteid is not None or self.remoteid_ble is not None,
+                         enabled=(self.remoteid is not None or self.remoteid_ble is not None
+                                  or self.remoteid_hci is not None),
                          running=bool(
                              (self.remoteid and self.remoteid._task and not self.remoteid._task.done())
                              or (self.remoteid_ble and self.remoteid_ble._task and not self.remoteid_ble._task.done())
+                             or (self.remoteid_hci and self.remoteid_hci.running)
                          )),
             ModuleStatus(name="nwr",
                          enabled=True,
@@ -325,6 +334,31 @@ class Manager:
                     pass
                 self.remoteid_ble = None
 
+    async def start_remoteid_hci(self) -> None:
+        """Start the raw-USB HCI scanner for a Realtek RTL8761B(U) dongle.
+
+        Requires the dongle to be bound to WinUSB via Zadig. Runs in parallel
+        with the bleak-based scanner — they observe the same advertisement
+        traffic on independent radios, which is exactly the point (extra
+        antenna coverage, no fighting over the Microsoft BT stack)."""
+        async with self._lock:
+            if self.remoteid_hci is None:
+                self.remoteid_hci = HCIScanner(self.tracker)
+            try:
+                await self.remoteid_hci.start()
+            except Exception as e:
+                log.warning("HCI Drone-RID start failed: %s", e)
+                raise
+
+    async def stop_remoteid_hci(self) -> None:
+        async with self._lock:
+            if self.remoteid_hci:
+                try:
+                    await self.remoteid_hci.stop()
+                except Exception:
+                    pass
+                self.remoteid_hci = None
+
     async def start_remoteid(self, interface: str, monitor: bool = True, channel: int = 6) -> None:
         """Back-compat: start both WiFi sniffer and BLE scanner together.
         Used by the CLI -wifi flag and the legacy 'drone' module name. The
@@ -338,6 +372,7 @@ class Manager:
     async def stop_remoteid(self) -> None:
         await self.stop_remoteid_wifi()
         await self.stop_remoteid_ble()
+        await self.stop_remoteid_hci()
 
     async def start_nwr(self, frequency_mhz: float, device: int = 0) -> None:
         """Start NWR with device-conflict tracking."""

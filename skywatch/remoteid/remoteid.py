@@ -36,7 +36,8 @@ _MSG_PACK = 0xF
 
 @dataclass
 class _DroneState:
-    uas_id: str = ""
+    uas_id: str = ""          # IDType=1 — manufacturer serial (ANSI/CTA-2063-A)
+    registration: str = ""    # IDType=2 — CAA-assigned registration (e.g. FAA)
     operator_id: str = ""
     description: str = ""
     lat: float = 0.0
@@ -121,10 +122,12 @@ def parse_remote_id_ie(payload: bytes) -> list[tuple[int, bytes]]:
         return out
     msg_type = (payload[0] >> 4) & 0x0F
     if msg_type == _MSG_PACK:
-        if len(payload) < 2:
+        # ODID_MessagePack_encoded: byte 1 = SingleMsgSize (= 25),
+        # byte 2 = MsgPackSize (count), body starts at byte 3.
+        if len(payload) < 3:
             return out
-        count = payload[1]
-        body = payload[2:]
+        count = payload[2]
+        body = payload[3:]
         # Each packed message is 25 bytes per ASTM F3411-22a.
         for i in range(count):
             sub = body[i * 25 : (i + 1) * 25]
@@ -145,36 +148,53 @@ def _decode_ascii(b: bytes) -> str:
 
 def _apply_message(state: _DroneState, msg_type: int, body: bytes) -> bool:
     """Update state from one Open Drone ID message. Returns True if the
-    drone has at least an ID + a position (publishable)."""
+    drone has at least an ID + a position (publishable).
+
+    Offsets are relative to the start of the 25-byte ODID message: byte 0
+    is the ProtoVersion|MessageType header; data fields begin at byte 1.
+    """
     if msg_type == _MSG_BASIC_ID:
-        if len(body) >= 21:
-            state.uas_id = _decode_ascii(body[1:21])
+        # byte 1 high nibble = IDType, bytes 2..21 = UASID (20 bytes).
+        # ASTM allows broadcasting multiple Basic-ID frames with different
+        # IDTypes (serial + CAA registration); keep them in separate fields.
+        if len(body) >= 22:
+            id_type = (body[1] >> 4) & 0x0F
+            value = _decode_ascii(body[2:22])
+            if id_type == 2:
+                state.registration = value
+            else:
+                state.uas_id = value
     elif msg_type == _MSG_LOCATION:
-        if len(body) >= 18:
-            heading_byte = body[1]
-            speed_raw = struct.unpack_from("<H", body, 2)[0]
-            lat_raw = struct.unpack_from("<i", body, 6)[0]
-            lon_raw = struct.unpack_from("<i", body, 10)[0]
-            press_alt = struct.unpack_from("<H", body, 14)[0]
-            geo_alt = struct.unpack_from("<H", body, 16)[0]
+        # byte 1 = Status, byte 2 = Direction, byte 3 = SpeedH (uint8),
+        # bytes 5..8 = Latitude, 9..12 = Longitude,
+        # bytes 13..14 = AltitudeBaro, 15..16 = AltitudeGeo
+        if len(body) >= 17:
+            direction = body[2]
+            speed_h = body[3]
+            lat_raw = struct.unpack_from("<i", body, 5)[0]
+            lon_raw = struct.unpack_from("<i", body, 9)[0]
+            press_alt = struct.unpack_from("<H", body, 13)[0]
+            geo_alt = struct.unpack_from("<H", body, 15)[0]
             # Per ASTM: heading 0..360 mapped to byte 0..255; speed in 0.25 m/s.
-            state.heading = (heading_byte / 255.0) * 360.0
-            speed_ms = speed_raw * 0.25
-            state.speed_kt = speed_ms * 1.94384
+            state.heading = (direction / 255.0) * 360.0
+            state.speed_kt = (speed_h * 0.25) * 1.94384
             state.lat = lat_raw * 1e-7
             state.lon = lon_raw * 1e-7
             # Altitude: value * 0.5 - 1000 meters.
             state.altitude_m = (geo_alt or press_alt) * 0.5 - 1000.0
     elif msg_type == _MSG_SELF_ID:
-        if len(body) >= 24:
-            state.description = _decode_ascii(body[1:24])
+        # byte 1 = DescriptionType, bytes 2..24 = Description (23 bytes)
+        if len(body) >= 25:
+            state.description = _decode_ascii(body[2:25])
     elif msg_type == _MSG_OPERATOR_ID:
-        if len(body) >= 21:
-            state.operator_id = _decode_ascii(body[1:21])
+        # byte 1 = OperatorIdType, bytes 2..21 = OperatorId (20 bytes)
+        if len(body) >= 22:
+            state.operator_id = _decode_ascii(body[2:22])
     elif msg_type == _MSG_SYSTEM:
-        if len(body) >= 9:
-            op_lat = struct.unpack_from("<i", body, 1)[0]
-            op_lon = struct.unpack_from("<i", body, 5)[0]
+        # bytes 2..5 = OperatorLatitude, 6..9 = OperatorLongitude (both int32)
+        if len(body) >= 10:
+            op_lat = struct.unpack_from("<i", body, 2)[0]
+            op_lon = struct.unpack_from("<i", body, 6)[0]
             state.op_lat = op_lat * 1e-7
             state.op_lon = op_lon * 1e-7
     return bool(state.uas_id and (state.lat or state.lon))

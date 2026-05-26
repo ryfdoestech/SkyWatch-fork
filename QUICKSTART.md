@@ -59,6 +59,11 @@ If you have multiple dongles, repeat for each one.
 
 > **⚠️ Don't skip this** — without WinUSB, SkyWatch can't talk to the dongle and any "Start" button that uses RTL-SDR will fail.
 
+> [!TIP]
+> **Optional: second Bluetooth radio for drone scanning.** If you also have a Realtek RTL8761B(U) USB Bluetooth dongle and you want it to run *alongside* your laptop's built-in Bluetooth (extra antenna coverage, or just because it has a better aerial), Zadig it the same way — pick **Realtek Bluetooth 5.3 Adapter** (USB ID `2C0A 8761`), target driver **WinUSB**, Replace Driver. The dongle then disappears from Device Manager's Bluetooth section (this is expected) and a third row appears under SkyWatch's Drones tab: **"Bluetooth LE — Realtek dongle (WinUSB)"**. The firmware blobs for the dongle ship in `tools\win64\` — no extra download.
+>
+> **Do NOT Zadig "Intel(R) Wireless Bluetooth(R)"** or any other built-in radio — you'll lose all Bluetooth on the host. Look for the **`2C0A 8761`** USB ID specifically.
+
 ### 3. Run SkyWatch
 
 Double-click **`start.bat`** in the unzipped folder.
@@ -84,7 +89,8 @@ Click **Settings** (top-right) to open the panel. Each module has a **Start** bu
 |---|---|---|
 | Aircraft (OpenSky internet feed) | Nothing — works on any internet connection | Aircraft tab → pick **Online (OpenSky)** → Start |
 | Aircraft (your dongle) | RTL-SDR + ADS-B antenna | Aircraft tab → pick a Device → Start |
-| Drones (Bluetooth LE Remote ID) | Built-in Bluetooth radio | Drones tab → **Bluetooth LE scanner** → Start |
+| Drones (Bluetooth LE — onboard) | Built-in Bluetooth radio | Drones tab → **Bluetooth LE — onboard radio** → Start |
+| Drones (Bluetooth LE — Realtek dongle) | Optional second BT radio: a Realtek RTL8761B(U) USB dongle Zadig'd to WinUSB | Drones tab → **Bluetooth LE — Realtek dongle (WinUSB)** → Start |
 | Drones (WiFi monitor mode) | Compatible USB WiFi adapter + Npcap | Drones tab → pick the adapter → Start |
 
 Watch the map fill up. Use the tabs on the right side (All / Aircraft / Drones) to filter.

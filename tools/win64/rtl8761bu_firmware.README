@@ -1,0 +1,35 @@
+Realtek RTL8761BU Bluetooth firmware blobs
+==========================================
+
+Files:
+  rtl8761bu_fw.bin       — patch firmware (42088 bytes)
+  rtl8761bu_config.bin   — patch configuration (6 bytes)
+
+These are uploaded to the dongle by skywatch/remoteid/ble_hci.py at start time.
+The chip cannot operate without them, and Windows's generic Bluetooth USB driver
+does not ship a copy.
+
+Source
+------
+Mirrored from https://github.com/andrew-ld/rtl8761b-firmware (master branch),
+which is in turn a copy of the rtl_bt/ directory in the upstream linux-firmware
+repository at https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git
+
+License
+-------
+Realtek redistributable firmware. Per linux-firmware's WHENCE file, these
+RTL Bluetooth blobs are governed by LICENCE.rtlwifi_firmware.txt:
+
+  "Redistribution. Redistribution and use in binary form, without modification,
+   are permitted provided that the following conditions are met:
+   * Redistributions must reproduce the above copyright notice and the
+     following disclaimer in the documentation and/or other materials
+     provided with the distribution.
+   * Neither the name of Realtek Semiconductor Corporation nor the names of
+     its suppliers may be used to endorse or promote products derived from
+     this software without specific prior written permission.
+   * No reverse engineering, decompilation, or disassembly of this software
+     is permitted.
+   Limited patent license. ..."
+
+Full text: https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/tree/LICENCE.rtlwifi_firmware.txt

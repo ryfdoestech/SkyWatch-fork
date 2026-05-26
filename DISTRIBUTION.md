@@ -55,8 +55,8 @@ del data\api_keys.json 2>nul
 `data\api_keys.json` is gitignored but may exist locally. `.venv` is the developer's venv — testers use the bundled `tools\python-win64\` instead.
 
 Keep:
-- `tools\win64\` — RF binaries.
-- `tools\python-win64\` — bundled Python with deps installed.
+- `tools\win64\` — RF binaries **plus** the Realtek BT firmware blobs (`rtl8761bu_fw.bin` ~42 KB, `rtl8761bu_config.bin` 6 B, `rtl8761bu_firmware.README` provenance + license). These are uploaded to a Realtek RTL8761B(U) USB BT dongle by `skywatch/remoteid/ble_hci.py` when a tester opts into the second-BT-radio path. Don't strip them — the HCI scanner refuses to start if they're missing.
+- `tools\python-win64\` — bundled Python with deps installed. As of the addition of the HCI BT path this includes **`pyusb`**, which is required by `skywatch/remoteid/ble_hci.py`. If you ever rebuild the embeddable Python from scratch with `scripts\setup-bundle.bat`, make sure the `pyusb>=1.2` line in [requirements.txt](requirements.txt) is honored.
 - `data\aircraft.json` if you want testers to start with a populated aircraft DB (huge file — usually skip).
 
 ### 3. Stamp the version

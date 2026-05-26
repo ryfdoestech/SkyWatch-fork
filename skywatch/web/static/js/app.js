@@ -882,9 +882,9 @@
                 html += '<div style="color:' + wifiRidColor + '">🛸 Drone RID: ' + s.frames_rid +
                     ' <span style="color:#64748b">(last ' + ago(s.last_rid_at) + ')</span></div>';
 
-                html += '<div style="color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-top:6px;margin-bottom:2px">Bluetooth LE</div>';
+                html += '<div style="color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-top:6px;margin-bottom:2px">Bluetooth LE — onboard radio</div>';
                 if (!s.ble_running) {
-                    html += '<div style="color:#fca5a5">BLE scanner not running (check that Bluetooth is on).</div>';
+                    html += '<div style="color:#fca5a5">Onboard BLE scanner not running.</div>';
                 } else {
                     var bleStale = (s.ble_frames_total === 0 || (s.ble_last_frame_at && Date.now()/1000 - s.ble_last_frame_at > 30));
                     var bleColor = bleStale ? '#fca5a5' : '#6ee7b7';
@@ -895,8 +895,31 @@
                         ' <span style="color:#64748b">(last ' + ago(s.ble_last_rid_at) + ')</span></div>';
                 }
 
-                if (s.frames_total === 0 && (!s.ble_running || s.ble_frames_total === 0)) {
-                    html += '<div style="color:#fca5a5;margin-top:4px">No packets on either band — check adapter / Bluetooth.</div>';
+                html += '<div style="color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;margin-top:6px;margin-bottom:2px">Bluetooth LE — Realtek dongle (HCI/USB)</div>';
+                if (!s.hci_present && !s.hci_running) {
+                    html += '<div style="color:#64748b">Dongle not detected over USB.</div>';
+                } else if (!s.hci_running) {
+                    html += '<div style="color:#fbbf24">Dongle detected but scanner not started.</div>';
+                } else {
+                    var hciStale = (s.hci_frames_total === 0 || (s.hci_last_frame_at && Date.now()/1000 - s.hci_last_frame_at > 30));
+                    var hciColor = hciStale ? '#fca5a5' : '#6ee7b7';
+                    var hciRidColor = (s.hci_frames_rid > 0) ? '#6ee7b7' : '#fbbf24';
+                    html += '<div style="color:' + hciColor + '">🔌 Adv frames: ' + s.hci_frames_total +
+                        ' <span style="color:#64748b">(last ' + ago(s.hci_last_frame_at) + ')</span></div>';
+                    html += '<div style="color:' + hciRidColor + '">🛸 Drone RID: ' + s.hci_frames_rid +
+                        ' <span style="color:#64748b">(last ' + ago(s.hci_last_rid_at) + ')</span></div>';
+                }
+                if (s.hci_error) {
+                    html += '<div style="color:#fca5a5;font-size:10px;margin-top:2px">' +
+                        s.hci_error.replace(/</g, '&lt;') + '</div>';
+                }
+
+                // Show/hide the "plug in / Zadig" hint under the dongle button.
+                var hint = document.getElementById('drone-ble-hci-hint');
+                if (hint) hint.classList.toggle('hidden', !!s.hci_present);
+
+                if (s.frames_total === 0 && (!s.ble_running || s.ble_frames_total === 0) && (!s.hci_running || s.hci_frames_total === 0)) {
+                    html += '<div style="color:#fca5a5;margin-top:4px">No packets on any band — check adapter / Bluetooth.</div>';
                 } else if (s.frames_total > 0 && s.frames_mgmt === 0) {
                     html += '<div style="color:#fbbf24;margin-top:4px">WiFi packets flowing but no beacons — adapter likely not in monitor mode.</div>';
                 }
@@ -1519,6 +1542,10 @@
                 } else if (module === 'drone-ble') {
                     // BLE uses the host's default Bluetooth radio — no
                     // dropdown, no validation needed.
+                } else if (module === 'drone-ble-hci') {
+                    // Realtek dongle is auto-discovered by VID/PID over USB —
+                    // no dropdown either. The backend will surface a clear
+                    // error if the dongle isn't bound to WinUSB yet.
                 } else {
                     var sel = document.getElementById(module + '-device');
                     if (sel) {
@@ -1985,6 +2012,9 @@
         if (overlay) { overlay.classList.add('hidden'); overlay.style.display = ''; }
     };
 
+    // APRS TX UI was removed in v1.1.0; skip wiring if the panel isn't in the DOM
+    // so an uncaught TypeError doesn't halt the rest of init (notably connect()).
+    if (document.getElementById('tx-save-call')) {
     document.getElementById('tx-save-call').addEventListener('click', function() {
         var call = document.getElementById('tx-callsign').value.trim().toUpperCase();
         var ssid = parseInt(document.getElementById('tx-ssid').value) || 9;
@@ -2082,6 +2112,7 @@
             showTXStatus('Failed: ' + err.message, true);
         });
     });
+    }  // end APRS-TX guard
 
     function showTXStatus(msg, isError) {
         var el = document.getElementById('tx-status');

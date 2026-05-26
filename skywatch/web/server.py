@@ -21,7 +21,7 @@ from ..tracker import Tracker, Target
 from ..sdr import list_devices
 from ..adsb import AircraftDB
 from ..ais import AISStream, lookup_vessel_photo
-from ..remoteid import list_wifi_interfaces
+from ..remoteid import list_wifi_interfaces, find_hci_dongle
 from ..aprs import APRSStore, APRSISConfig, compute_passcode, build_position_beacon, build_message
 from ..aprs.tx import build_status
 from ..noaa import NOAA_SATELLITES, NWR_TRANSMITTERS
@@ -308,6 +308,11 @@ def build_app(*, tracker: Tracker, aprs_store: APRSStore, manager: Manager,
             # No interface needed — uses the host Bluetooth radio (or whichever
             # USB BT dongle the OS has configured as default).
             await manager.start_remoteid_ble()
+        elif module == "drone-ble-hci":
+            # Raw-USB HCI path for a Realtek RTL8761B(U) dongle bound to WinUSB.
+            # Bypasses the OS Bluetooth stack, so it can run alongside the
+            # onboard radio without Code 31 driver conflicts.
+            await manager.start_remoteid_hci()
         elif module == "noaa":
             # Frontend uses this for the NOAA auto-capture daemon. The tracker
             # is already running; just acknowledge so the UI updates.
@@ -347,6 +352,8 @@ def build_app(*, tracker: Tracker, aprs_store: APRSStore, manager: Manager,
             await manager.stop_remoteid_wifi()
         elif module == "drone-ble":
             await manager.stop_remoteid_ble()
+        elif module == "drone-ble-hci":
+            await manager.stop_remoteid_hci()
         elif module == "noaa":
             return {"ok": True}
         elif module == "aprs-is":
@@ -432,12 +439,17 @@ def build_app(*, tracker: Tracker, aprs_store: APRSStore, manager: Manager,
     async def api_remoteid_stats():
         r = manager.remoteid
         ble = manager.remoteid_ble
+        hci = manager.remoteid_hci
         wifi_running = bool(r and r._task and not r._task.done())
         ble_running = bool(ble and ble._task and not ble._task.done())
+        hci_running = bool(hci and hci.running)
+        # Probe for the Realtek dongle off-thread so the WS broadcaster isn't
+        # stalled on a libusb enumeration during health polls.
+        hci_present = await asyncio.to_thread(find_hci_dongle)
         return {
-            # `running` = either band live, so the legacy "Sniffer not running."
-            # banner clears the moment any band starts.
-            "running": wifi_running or ble_running,
+            # `running` = any of the three paths live, so the legacy "Sniffer
+            # not running." banner clears the moment any path starts.
+            "running": wifi_running or ble_running or hci_running,
             "wifi_running": wifi_running,
             "interface": r.cfg.interface if r else "",
             "frames_total": r.frames_total if r else 0,
@@ -450,6 +462,13 @@ def build_app(*, tracker: Tracker, aprs_store: APRSStore, manager: Manager,
             "ble_frames_rid": ble.frames_rid if ble else 0,
             "ble_last_frame_at": ble.last_frame_at if ble else 0,
             "ble_last_rid_at": ble.last_rid_at if ble else 0,
+            "hci_running": hci_running,
+            "hci_present": hci_present is not None,
+            "hci_frames_total": hci.frames_total if hci else 0,
+            "hci_frames_rid": hci.frames_rid if hci else 0,
+            "hci_last_frame_at": hci.last_frame_at if hci else 0,
+            "hci_last_rid_at": hci.last_rid_at if hci else 0,
+            "hci_error": (hci.last_error if hci else ""),
         }
 
     # ---- Alert zones ----

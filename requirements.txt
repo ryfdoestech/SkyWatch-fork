@@ -23,6 +23,10 @@ scapy>=2.5
 # Bluetooth LE (Drone Remote ID alternate path)
 bleak>=0.21
 
+# Raw USB HCI access for Realtek RTL8761B Bluetooth dongles
+# (lets a second BT radio run via WinUSB without taking over the OS BT stack)
+pyusb>=1.2
+
 # Signal processing (APT image decode, NWR scan, FM demod)
 numpy>=1.24
 scipy>=1.10

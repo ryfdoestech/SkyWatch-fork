@@ -91,6 +91,11 @@ class NativeADSB:
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        # Stateful pyModeS decoder. Built once per worker run in _run() so
+        # the per-ICAO CPR pair-matching state doesn't leak across stop/start
+        # cycles. PipeDecoder is documented as not thread-safe — fine here
+        # because _handle() only runs on the worker thread.
+        self._pipe = None
         # Counters exposed via the dashboard so users can see it's alive.
         self.preambles_seen = 0
         self.messages_decoded = 0
@@ -98,8 +103,10 @@ class NativeADSB:
         self.last_msg_at = 0.0
 
     def set_reference(self, lat: float, lon: float) -> None:
-        """Update the lat/lon used for CPR position decoding. Safe to call
-        from any thread — the worker reads it lazily."""
+        """Kept for API compatibility with the older single-message CPR path
+        (the /api/aircraft/bounds route still calls this on map pan). The
+        PipeDecoder doesn't need a reference for airborne positions, so this
+        is now a no-op stored on cfg purely for diagnostics."""
         self.cfg.reference_lat = float(lat)
         self.cfg.reference_lon = float(lon)
 
@@ -130,6 +137,13 @@ class NativeADSB:
     # ── Worker thread ────────────────────────────────────────────────
 
     def _run(self) -> None:
+        # Build the stateful decoder fresh per run.
+        try:
+            from pyModeS import PipeDecoder  # type: ignore
+            self._pipe = PipeDecoder()
+        except Exception as e:
+            log.error("pyModeS PipeDecoder unavailable: %s", e)
+            return
         try:
             from rtlsdr import RtlSdr  # type: ignore
         except Exception as e:
@@ -227,12 +241,14 @@ class NativeADSB:
     # ── Message → Target ─────────────────────────────────────────────
 
     def _handle(self, hex_msg: str) -> None:
-        import pyModeS  # local import keeps module-level cheap
-        ref = None
-        if self.cfg.reference_lat or self.cfg.reference_lon:
-            ref = (self.cfg.reference_lat, self.cfg.reference_lon)
+        # PipeDecoder resolves airborne lat/lon from odd+even CPR pairs
+        # internally, so we don't need (and shouldn't supply) a reference —
+        # that was the source of the "all aircraft cluster at the map centre"
+        # bug when the dashboard hadn't been panned to the receiver's area.
+        if self._pipe is None:
+            return
         try:
-            result = pyModeS.decode(hex_msg, reference=ref)
+            result = self._pipe.decode(hex_msg, timestamp=time.time())
         except Exception:
             return
         if not result:

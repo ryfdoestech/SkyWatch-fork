@@ -237,11 +237,17 @@
                     <button class="module-toggle" data-module="drone-wifi" id="drone-wifi-toggle">Start</button>
                 </div>
                 <div class="dw-hint">Adapter must support 802.11 monitor mode (e.g. Alfa AWUS036NHA/ACH).</div>
-                <div class="adsb-device-row" title="BLE scanner — uses host Bluetooth radio or USB BT dongle. Catches DJI Mini/Mavic/Air RID broadcasts.">
+                <div class="adsb-device-row" title="BLE scanner — uses host Bluetooth radio. Catches DJI Mini/Mavic/Air RID broadcasts.">
                     <span class="module-icon drone-color" style="font-size:14px">&#x1F4F6;</span>
-                    <span class="dw-label-inline">Bluetooth LE scanner (host BT radio)</span>
+                    <span class="dw-label-inline">Bluetooth LE — onboard radio (WinRT/bleak)</span>
                     <button class="module-toggle" data-module="drone-ble" id="drone-ble-toggle">Start</button>
                 </div>
+                <div class="adsb-device-row" title="Raw-USB HCI driver for a Realtek RTL8761B(U) dongle. Bypasses the OS Bluetooth stack, so it can run alongside the onboard radio without driver conflicts. Requires the dongle to be bound to WinUSB via Zadig.">
+                    <span class="module-icon drone-color" style="font-size:14px">&#x1F50C;</span>
+                    <span class="dw-label-inline" id="drone-ble-hci-label">Bluetooth LE — Realtek dongle (WinUSB)</span>
+                    <button class="module-toggle" data-module="drone-ble-hci" id="drone-ble-hci-toggle">Start</button>
+                </div>
+                <div id="drone-ble-hci-hint" class="dw-hint hidden">Dongle not detected over USB. Plug it in and run Zadig (Replace Driver → WinUSB) on the Realtek BT adapter.</div>
                 <div id="drone-stats" class="dw-status-line">Sniffer not running.</div>
             </div>
 

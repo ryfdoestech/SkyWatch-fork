@@ -77,9 +77,10 @@ Open **http://localhost:8080** → click ⚙ Settings → pick a module → **St
 <details open>
 <summary><strong>🛸 Drone Remote ID (ASTM F3411)</strong></summary>
 
-Catches drones broadcasting their identity and position. **Two independent radio bands**, either is enough to put a drone on the map:
+Catches drones broadcasting their identity and position. **Three independent receive paths**, any one is enough to put a drone on the map — and they can all run simultaneously for extra antenna coverage:
 
-- **📶 Bluetooth LE** — uses the host's built-in Bluetooth radio. **Just works**, catches DJI Mini 3/4 Pro, Mavic 3, Air 3, etc.
+- **📶 Bluetooth LE — onboard radio** — uses the host's built-in Bluetooth radio via WinRT/bleak. **Just works**, catches DJI Mini 3/4 Pro, Mavic 3, Air 3, etc.
+- **🔌 Bluetooth LE — Realtek dongle (WinUSB)** — a second BT radio over a Realtek RTL8761B(U) USB dongle, talked to via raw HCI through libusb. Bypasses the Microsoft Bluetooth stack so it runs alongside the onboard radio without the Code-31 "only one BT radio at a time" Windows limitation. One-time Zadig swap required; firmware blobs ship in `tools/win64/`.
 - **📡 WiFi monitor mode** — sniffs 802.11 beacons + probe-responses for the F3411 vendor IE. Requires Npcap + a chipset whose driver supports monitor mode. **Most laptop WiFi cards refuse** — see [SETUP.md §6](SETUP.md#6-drone-remote-id) for known-good adapters.
 
 </details>
@@ -138,7 +139,8 @@ Two independent receive paths plus an internet TX path:
 |---|:---:|:---:|:---:|
 | ADS-B (RF) | ✅ | ✅ | ✅ (WinUSB via Zadig) |
 | OpenSky online aircraft | ✅ | ✅ | ✅ |
-| Drone RID — Bluetooth LE | ✅ | ✅ | ✅ |
+| Drone RID — Bluetooth LE (onboard radio) | ✅ | ✅ | ✅ |
+| Drone RID — Bluetooth LE (Realtek RTL8761B USB dongle, raw HCI) | — | — | ✅ Zadig → WinUSB; see [§6.4](SETUP.md#64-second-bt-radio-realtek-rtl8761b-via-winusb) |
 | Drone RID — WiFi monitor mode | ✅ | ✅ * | ⚠️ Npcap **and** a compatible chipset — see [§6](SETUP.md#6-drone-remote-id) |
 
 **Backend-only modules (CLI flags / REST API; no UI as of v1.1.0):**
@@ -231,7 +233,11 @@ skywatch/
 │                      station + message store, beacon/message TX
 ├── noaa/              SGP4 tracker, APT capture, NWR weather radio,
 │                      weather.gov client
-├── remoteid/          scapy WiFi sniffer + ASTM F3411 parser
+├── remoteid/          scapy WiFi sniffer, ASTM F3411 parser,
+│                      bleak BLE scanner (onboard radio), and
+│                      ble_hci raw-USB HCI driver for a second
+│                      Realtek RTL8761B(U) BT dongle (firmware
+│                      upload + LE scan over libusb)
 ├── web/
 │   ├── server.py      FastAPI app + REST routes + WebSocket
 │   ├── manager.py     Module lifecycle
