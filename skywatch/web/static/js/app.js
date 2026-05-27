@@ -3407,6 +3407,36 @@
     // ── Public API ──
     window.skywatch.select = selectTarget;
 
+    // ── Sidebar toggle (hamburger in header) ──
+    var sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
+    var sidebarEl = document.getElementById('sidebar');
+    if (sidebarToggleBtn && sidebarEl) {
+        function applySidebarState(hidden) {
+            document.body.classList.toggle('sidebar-hidden', hidden);
+            sidebarToggleBtn.title = hidden ? 'Show sidebar' : 'Hide sidebar';
+            sidebarToggleBtn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+            try { localStorage.setItem('skywatch.sidebar.hidden', hidden ? '1' : '0'); } catch (e) {}
+        }
+        var savedHidden = false;
+        try { savedHidden = localStorage.getItem('skywatch.sidebar.hidden') === '1'; } catch (e) {}
+        if (savedHidden) {
+            // Skip the transition on initial load so the map starts at its final size.
+            sidebarEl.style.transition = 'none';
+            applySidebarState(true);
+            requestAnimationFrame(function() { sidebarEl.style.transition = ''; });
+            map.invalidateSize();
+        }
+        sidebarToggleBtn.addEventListener('click', function() {
+            applySidebarState(!document.body.classList.contains('sidebar-hidden'));
+        });
+        // Repaint Leaflet tiles into the new size once the slide completes.
+        sidebarEl.addEventListener('transitionend', function(ev) {
+            if (ev.propertyName === 'width' || ev.propertyName === 'height') {
+                map.invalidateSize();
+            }
+        });
+    }
+
     // ── Start ──
     connect();
 
