@@ -96,6 +96,9 @@ class NativeADSB:
         # cycles. PipeDecoder is documented as not thread-safe — fine here
         # because _handle() only runs on the worker thread.
         self._pipe = None
+        # pyModeS module cached for the single-message locally-referenced CPR
+        # fallback in _handle(). Set in _run().
+        self._pms = None
         # Counters exposed via the dashboard so users can see it's alive.
         self.preambles_seen = 0
         self.messages_decoded = 0
@@ -103,10 +106,11 @@ class NativeADSB:
         self.last_msg_at = 0.0
 
     def set_reference(self, lat: float, lon: float) -> None:
-        """Kept for API compatibility with the older single-message CPR path
-        (the /api/aircraft/bounds route still calls this on map pan). The
-        PipeDecoder doesn't need a reference for airborne positions, so this
-        is now a no-op stored on cfg purely for diagnostics."""
+        """Update the reference point used for single-message (locally-
+        referenced) CPR decode in _handle(). Called from /api/aircraft/bounds
+        whenever the dashboard pans, so the fallback always tracks the user's
+        visible area. A (0, 0) reference disables the fallback — see
+        _handle() for the reason."""
         self.cfg.reference_lat = float(lat)
         self.cfg.reference_lon = float(lon)
 
@@ -139,8 +143,14 @@ class NativeADSB:
     def _run(self) -> None:
         # Build the stateful decoder fresh per run.
         try:
+            import pyModeS as pms  # type: ignore
             from pyModeS import PipeDecoder  # type: ignore
             self._pipe = PipeDecoder()
+            # Cache the module-level decode() for the single-message
+            # locally-referenced CPR fallback in _handle(). pyModeS v3
+            # removed the v2 per-field API (pms.adsb.*, pms.df) and replaced
+            # it with one decode() that takes `reference=(lat, lon)`.
+            self._pms = pms
         except Exception as e:
             log.error("pyModeS PipeDecoder unavailable: %s", e)
             return
@@ -242,9 +252,12 @@ class NativeADSB:
 
     def _handle(self, hex_msg: str) -> None:
         # PipeDecoder resolves airborne lat/lon from odd+even CPR pairs
-        # internally, so we don't need (and shouldn't supply) a reference —
-        # that was the source of the "all aircraft cluster at the map centre"
-        # bug when the dashboard hadn't been panned to the receiver's area.
+        # internally. When the pair hasn't completed yet (weak/intermittent
+        # signal) we fall through to pyModeS.decode(msg, reference=…) below,
+        # which decodes a single airborne-position message against a known
+        # reference. The fallback only runs when a real reference is set —
+        # the old "all aircraft cluster at the map centre" bug was caused
+        # by single-message decode against a (0, 0) reference.
         if self._pipe is None:
             return
         try:
@@ -269,6 +282,23 @@ class NativeADSB:
             if result["latitude"] is not None and result["longitude"] is not None:
                 target.lat = float(result["latitude"])
                 target.lon = float(result["longitude"])
+        # Single-message locally-referenced fallback. pyModeS v3's decode()
+        # adds `latitude`/`longitude` to the result when a `reference` is
+        # supplied and the frame is an airborne CPR position (BDS 0,5).
+        # Skipped when no real reference is configured — see comment above.
+        if target.lat == 0.0 and target.lon == 0.0 and self._pms is not None:
+            ref_lat = self.cfg.reference_lat
+            ref_lon = self.cfg.reference_lon
+            if ref_lat != 0.0 or ref_lon != 0.0:
+                try:
+                    local = self._pms.decode(hex_msg, reference=(ref_lat, ref_lon))
+                    lat = local.get("latitude") if local else None
+                    lon = local.get("longitude") if local else None
+                    if lat is not None and lon is not None:
+                        target.lat = float(lat)
+                        target.lon = float(lon)
+                except Exception:
+                    pass
         if "squawk" in result and result["squawk"]:
             target.squawk = str(result["squawk"])
         if self.cfg.db:

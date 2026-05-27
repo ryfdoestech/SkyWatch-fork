@@ -369,6 +369,11 @@
         const activeIds = new Set();
 
         targets.forEach(function(t) {
+            // Backend to_json omits zero-valued fields, so a target without a
+            // position fix arrives with lat/lon undefined — not 0. Skip both
+            // shapes, otherwise L.marker([undefined, undefined]) throws and
+            // aborts the whole loop, hiding every later target too.
+            if (t.lat == null || t.lon == null) return;
             if (t.lat === 0 && t.lon === 0) return;
             activeIds.add(t.id);
 
