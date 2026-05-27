@@ -1764,6 +1764,140 @@ body {
 #notif-banner-ack { min-width: 160px; }
 
 /* ──────────────────────────────────────────────────────────
+   Onboarding (Getting Started) checklist
+   ────────────────────────────────────────────────────────── */
+#onboarding-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+#onboarding-overlay.hidden { display: none; }
+
+.onboarding-intro {
+    color: var(--dw-text-secondary);
+    font-size: var(--fs-hint);
+    margin-bottom: var(--sp-3);
+    line-height: 1.5;
+}
+
+#onboarding-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+}
+
+.onboarding-item {
+    background: var(--dw-surface);
+    border: 1px solid var(--dw-divider);
+    border-radius: var(--radius-card);
+    padding: var(--sp-3);
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: var(--sp-3);
+    align-items: center;
+}
+.onboarding-item.done   { opacity: 0.72; }
+.onboarding-item .ob-status {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    border: 2px solid var(--dw-divider);
+    background: var(--dw-bg);
+    color: var(--dw-text-dim);
+    flex-shrink: 0;
+}
+.onboarding-item.done .ob-status {
+    background: var(--chip-ua);
+    color: #042b08;
+    border-color: var(--chip-ua);
+}
+.onboarding-item.pending .ob-status {
+    background: var(--dw-accent-warn);
+    color: #2a1a00;
+    border-color: var(--dw-accent-warn);
+}
+.onboarding-item .ob-text {
+    min-width: 0;
+}
+.onboarding-item .ob-title {
+    font-weight: 700;
+    font-size: var(--fs-meta);
+    color: var(--dw-text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    flex-wrap: wrap;
+}
+.onboarding-item .ob-tag-optional {
+    font-size: var(--fs-column);
+    font-weight: 600;
+    color: var(--dw-text-dim);
+    background: var(--dw-bg);
+    border: 1px solid var(--dw-divider);
+    border-radius: var(--radius-chip);
+    padding: 1px 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.onboarding-item .ob-desc {
+    font-size: var(--fs-hint);
+    color: var(--dw-text-secondary);
+    margin-top: 3px;
+    line-height: 1.4;
+}
+.onboarding-item .ob-action {
+    min-width: 110px;
+    text-align: center;
+}
+.onboarding-item.done .ob-action {
+    visibility: hidden;
+}
+
+.onboarding-footer {
+    margin-top: var(--sp-4);
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--dw-divider);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+}
+.onboarding-suppress-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--fs-hint);
+    color: var(--dw-text-secondary);
+    cursor: pointer;
+}
+.onboarding-suppress-row input { cursor: pointer; }
+#onboarding-close-btn { min-width: 120px; }
+
+/* Small banner inside Settings modal that re-opens the checklist */
+.onboarding-reopen-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--dw-surface);
+    border: 1px solid var(--dw-divider);
+    border-radius: var(--radius-card);
+    margin-bottom: var(--sp-3);
+}
+
+/* ──────────────────────────────────────────────────────────
    Responsive
    ────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {

@@ -32,6 +32,10 @@
                 <button id="close-setup">&times;</button>
             </div>
             <div class="modal-body">
+                <div class="onboarding-reopen-row">
+                    <span class="dw-meta">First time? Reopen the setup checklist:</span>
+                    <button id="open-onboarding-btn" class="tx-btn-sm">Getting Started</button>
+                </div>
                 <div id="devices-loading">Scanning for RTL-SDR devices...</div>
                 <div id="devices-error" class="hidden"></div>
                 <div id="devices-list" class="hidden"></div>
@@ -258,6 +262,27 @@
             <div id="detail-panel" class="hidden">
                 <button id="close-detail">&times;</button>
                 <div id="detail-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Getting Started (onboarding) Modal -->
+    <div id="onboarding-overlay" class="hidden">
+        <div id="onboarding-modal" class="modal-shell">
+            <div class="modal-header">
+                <h2>Getting Started</h2>
+                <button class="modal-close" data-close="onboarding-overlay">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="onboarding-intro">A quick checklist to get the most out of SkyWatch. Items auto-tick as the system detects them. Optional items are marked.</p>
+                <div id="onboarding-list"></div>
+                <div class="onboarding-footer">
+                    <label class="onboarding-suppress-row">
+                        <input type="checkbox" id="onboarding-suppress"/>
+                        <span>Don't show this on next launch</span>
+                    </label>
+                    <button id="onboarding-close-btn" class="module-toggle start">Close</button>
+                </div>
             </div>
         </div>
     </div>

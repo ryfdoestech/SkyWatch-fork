@@ -3059,6 +3059,280 @@
     wireNotifications();
     updateAlertsCounter();
 
+    // ══════════════════════════════════════
+    // Getting Started (onboarding) checklist
+    // ══════════════════════════════════════
+
+    // Each step is async-checked against the same endpoints the Settings
+    // health panel uses, so the same status is shown in two places without
+    // drift. Items hide themselves when their underlying install/import is
+    // already complete (rather than just showing a green tick), so a fully
+    // set-up system sees an empty checklist.
+
+    function markNotifSeen() {
+        try { localStorage.setItem('skywatch.onboardingNotifSeen', '1'); } catch (e) {}
+    }
+    function notifSeen() {
+        try { return localStorage.getItem('skywatch.onboardingNotifSeen') === '1'; } catch (e) { return false; }
+    }
+
+    var ONBOARDING_STEPS = [
+        {
+            id: 'zadig-sdr',
+            title: 'Bind WinUSB to your RTL-SDR (Zadig)',
+            desc: 'SkyWatch can\'t talk to the dongle without this. Skip if you\'ve already done it for another SDR app.',
+            actionLabel: 'Open in Settings',
+            // The /api/devices endpoint only returns RTL-SDR dongles that
+            // pyrtlsdr can enumerate, which on Windows requires a WinUSB
+            // binding. So "we found at least one device" is a reliable
+            // proxy for "Zadig has been run successfully".
+            check: function() {
+                return fetch('/api/devices')
+                    .then(function(r) { return r.json(); })
+                    .then(function(devs) { return (devs && devs.length > 0) ? 'done' : 'pending'; })
+                    .catch(function() { return 'pending'; });
+            },
+            action: function() {
+                closeOnboarding();
+                openSetup();
+                setTimeout(function() {
+                    var p = document.getElementById('zadig-panel');
+                    if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
+            }
+        },
+        {
+            id: 'vcredist',
+            title: 'Install Visual C++ Runtime',
+            desc: 'Required for AIS-catcher and several bundled native tools.',
+            actionLabel: 'Open in Settings',
+            check: function() {
+                return fetch('/api/vcredist/status')
+                    .then(function(r) { return r.json(); })
+                    .then(function(s) {
+                        if (!s.supported) return 'hide';
+                        return s.installed ? 'hide' : 'pending';
+                    })
+                    .catch(function() { return 'hide'; });
+            },
+            action: function() {
+                closeOnboarding();
+                openSetup();
+                setTimeout(function() {
+                    var p = document.getElementById('vcredist-panel');
+                    if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
+            }
+        },
+        {
+            id: 'npcap',
+            title: 'Install Npcap (for WiFi Drone-RID)',
+            desc: 'Required only if you plan to sniff drones over 802.11. Bluetooth Drone-RID works without it.',
+            optional: true,
+            actionLabel: 'Open in Settings',
+            check: function() {
+                return fetch('/api/npcap/status')
+                    .then(function(r) { return r.json(); })
+                    .then(function(s) {
+                        if (!s.supported) return 'hide';
+                        return s.installed ? 'hide' : 'pending';
+                    })
+                    .catch(function() { return 'hide'; });
+            },
+            action: function() {
+                closeOnboarding();
+                openSetup();
+                setTimeout(function() {
+                    var p = document.getElementById('npcap-panel');
+                    if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
+            }
+        },
+        {
+            id: 'zadig-bt',
+            title: 'Bind WinUSB to your Realtek BT dongle (Zadig)',
+            desc: 'Only needed for the HCI Drone-RID path on an external Realtek RTL8761B(U). Skip if you don\'t use one.',
+            optional: true,
+            actionLabel: 'Open in Settings',
+            // Only show this if the API reports the dongle is plugged in.
+            check: function() {
+                return fetch('/api/remoteid/stats')
+                    .then(function(r) { return r.json(); })
+                    .then(function(s) {
+                        if (!s.hci_present) return 'hide';
+                        // If HCI has ever produced frames OR is currently running,
+                        // the WinUSB binding is in place.
+                        if (s.hci_running || s.hci_frames_total > 0) return 'done';
+                        return 'pending';
+                    })
+                    .catch(function() { return 'hide'; });
+            },
+            action: function() {
+                closeOnboarding();
+                openSetup();
+                setTimeout(function() {
+                    var p = document.getElementById('zadig-panel');
+                    if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
+            }
+        },
+        {
+            id: 'aircraft-db',
+            title: 'Import Aircraft Database',
+            desc: 'Pulls ~500k registrations from OpenSky. Without it, military / tail-number alerts can\'t fire and the sidebar shows raw ICAO hex codes.',
+            actionLabel: 'Import now',
+            check: function() {
+                return fetch('/api/aircraft/status')
+                    .then(function(r) { return r.json(); })
+                    .then(function(s) { return (s.count && s.count > 0) ? 'done' : 'pending'; })
+                    .catch(function() { return 'pending'; });
+            },
+            action: function(item) {
+                var btn = item.querySelector('.ob-action');
+                if (!btn) return;
+                btn.disabled = true;
+                var orig = btn.textContent;
+                btn.textContent = 'Importing…';
+                fetch('/api/aircraft/import', { method: 'POST' })
+                    .then(function(r) { return r.json(); })
+                    .then(function(d) {
+                        if (d && d.count > 0) renderOnboarding();
+                        else { btn.disabled = false; btn.textContent = orig; }
+                    })
+                    .catch(function() { btn.disabled = false; btn.textContent = orig; });
+            }
+        },
+        {
+            id: 'notifications',
+            title: 'Configure Notifications',
+            desc: 'Pick which alerts you want (military aircraft, drones, specific tail numbers) and how you want to be notified.',
+            actionLabel: 'Open Notifications',
+            check: function() {
+                return Promise.resolve(notifSeen() ? 'done' : 'pending');
+            },
+            action: function() {
+                closeOnboarding();
+                document.getElementById('notif-btn').click();
+            }
+        },
+        {
+            id: 'offline-maps',
+            title: 'Download offline map tiles',
+            desc: 'Cache the area you usually monitor so the map keeps working without internet.',
+            optional: true,
+            actionLabel: 'Open in Settings',
+            check: function() {
+                // tileDB is initialized async in the existing offline-tiles
+                // module — fall back to "pending" if it isn't ready yet.
+                return new Promise(function(resolve) {
+                    if (typeof countCachedTiles !== 'function') return resolve('pending');
+                    countCachedTiles().then(function(n) {
+                        resolve(n > 0 ? 'done' : 'pending');
+                    }).catch(function() { resolve('pending'); });
+                });
+            },
+            action: function() {
+                closeOnboarding();
+                openSetup();
+                setTimeout(function() {
+                    var p = document.querySelector('.map-download-section');
+                    if (p) p.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
+            }
+        }
+    ];
+
+    function renderOnboarding() {
+        var listEl = document.getElementById('onboarding-list');
+        if (!listEl) return;
+        // Render skeleton rows so layout doesn't jump as checks resolve.
+        listEl.innerHTML = ONBOARDING_STEPS.map(function(step) {
+            return '<div class="onboarding-item pending" data-step="' + step.id + '" style="visibility:hidden">' +
+                '<div class="ob-status">…</div>' +
+                '<div class="ob-text"><div class="ob-title">' + escHtml(step.title) + '</div></div>' +
+                '<button class="tx-btn-sm ob-action"></button>' +
+            '</div>';
+        }).join('');
+
+        Promise.all(ONBOARDING_STEPS.map(function(step) {
+            return step.check().then(function(status) { return { step: step, status: status }; });
+        })).then(function(results) {
+            var html = '';
+            var anyShown = false;
+            results.forEach(function(r) {
+                if (r.status === 'hide') return;
+                anyShown = true;
+                var step = r.step;
+                var done = (r.status === 'done');
+                html += '<div class="onboarding-item ' + (done ? 'done' : 'pending') + '" data-step="' + step.id + '">' +
+                    '<div class="ob-status">' + (done ? '✓' : '!') + '</div>' +
+                    '<div class="ob-text">' +
+                        '<div class="ob-title">' + escHtml(step.title) +
+                            (step.optional ? ' <span class="ob-tag-optional">Optional</span>' : '') +
+                        '</div>' +
+                        '<div class="ob-desc">' + escHtml(step.desc) + '</div>' +
+                    '</div>' +
+                    '<button class="tx-btn-sm ob-action" data-step="' + step.id + '"' +
+                        (done ? ' tabindex="-1"' : '') + '>' +
+                        escHtml(step.actionLabel) +
+                    '</button>' +
+                '</div>';
+            });
+            if (!anyShown) {
+                html = '<div class="dw-empty" style="padding:24px 12px">All set up — you\'re good to go.</div>';
+            }
+            listEl.innerHTML = html;
+        });
+    }
+
+    function openOnboarding() {
+        renderOnboarding();
+        var suppressEl = document.getElementById('onboarding-suppress');
+        try {
+            suppressEl.checked = localStorage.getItem('skywatch.onboardingDismissed') === '1';
+        } catch (e) {}
+        document.getElementById('onboarding-overlay').classList.remove('hidden');
+    }
+    function closeOnboarding() {
+        document.getElementById('onboarding-overlay').classList.add('hidden');
+    }
+
+    document.getElementById('onboarding-overlay').addEventListener('click', function(e) {
+        if (e.target === this) closeOnboarding();
+    });
+    document.getElementById('onboarding-close-btn').addEventListener('click', closeOnboarding);
+    document.getElementById('onboarding-suppress').addEventListener('change', function(e) {
+        try {
+            if (e.target.checked) localStorage.setItem('skywatch.onboardingDismissed', '1');
+            else localStorage.removeItem('skywatch.onboardingDismissed');
+        } catch (err) {}
+    });
+    // Action button clicks (event delegation since rows are rebuilt)
+    document.getElementById('onboarding-list').addEventListener('click', function(e) {
+        var t = e.target;
+        if (!t || !t.classList || !t.classList.contains('ob-action')) return;
+        var sid = t.getAttribute('data-step');
+        var step = ONBOARDING_STEPS.find(function(s) { return s.id === sid; });
+        var item = t.closest('.onboarding-item');
+        if (step && step.action) step.action(item);
+    });
+    // Re-open from Settings modal
+    var reopenBtn = document.getElementById('open-onboarding-btn');
+    if (reopenBtn) reopenBtn.addEventListener('click', function() {
+        // Close Settings so the onboarding modal isn't stacked on top.
+        document.getElementById('setup-overlay').classList.add('hidden');
+        openOnboarding();
+    });
+    // Mark notifications step done the first time the user opens the panel.
+    document.getElementById('notif-btn').addEventListener('click', markNotifSeen);
+
+    // Auto-open on launch unless the user has ticked "Don't show this again".
+    (function maybeAutoOpen() {
+        var dismissed = false;
+        try { dismissed = localStorage.getItem('skywatch.onboardingDismissed') === '1'; } catch (e) {}
+        if (!dismissed) openOnboarding();
+    })();
+
     // ── Drone rename (event-delegated on document because Leaflet popups
     // rebuild their DOM on every setPopupContent and inline handlers don't
     // survive the rewrite) ──
