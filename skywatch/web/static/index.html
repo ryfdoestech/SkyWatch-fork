@@ -14,6 +14,8 @@
         <div id="stats">
             <span id="aircraft-count" class="badge aircraft">Aircraft: 0</span>
             <span id="drone-count" class="badge drone">Drones: 0</span>
+            <button id="alerts-count" class="badge alerts" title="Click to view alert log">Alerts: 0</button>
+            <button id="notif-btn" class="badge setup-badge">Notifications</button>
             <button id="setup-btn" class="badge setup-badge">Settings</button>
             <button id="clear-map-btn" class="badge clear-badge">Clear Map</button>
             <span id="connection-status" class="badge disconnected">Disconnected</span>
@@ -259,6 +261,68 @@
             </div>
         </div>
     </div>
+
+    <!-- Notifications Modal -->
+    <div id="notif-overlay" class="hidden">
+        <div id="notif-modal" class="modal-shell">
+            <div class="modal-header">
+                <h2>Notifications</h2>
+                <button class="modal-close" data-close="notif-overlay">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3>Popup Style</h3>
+                <div class="dw-card">
+                    <label class="notif-radio-row">
+                        <input type="radio" name="notif-popup-style" value="toast" />
+                        <span>Toast (auto-dismiss)</span>
+                    </label>
+                    <div id="notif-toast-duration-row" class="notif-sub-row">
+                        <label for="notif-toast-duration">Dismiss after</label>
+                        <input id="notif-toast-duration" type="number" min="1" max="120" step="1" value="10" class="tx-input notif-num-input" />
+                        <span class="dw-meta">seconds</span>
+                    </div>
+                    <label class="notif-radio-row">
+                        <input type="radio" name="notif-popup-style" value="modal" />
+                        <span>Modal banner (acknowledge to dismiss)</span>
+                    </label>
+                </div>
+
+                <h3>Notification Types</h3>
+                <div id="notif-rules" class="dw-stack"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Log Modal -->
+    <div id="alert-log-overlay" class="hidden">
+        <div id="alert-log-modal" class="modal-shell">
+            <div class="modal-header">
+                <h2>Alert Log</h2>
+                <div class="modal-header-actions">
+                    <button id="alert-log-clear" class="tx-btn-sm">Clear Log</button>
+                    <button class="modal-close" data-close="alert-log-overlay">&times;</button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="alert-log-empty" class="dw-empty">No alerts yet.</div>
+                <div id="alert-log-list" class="dw-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast container (popup-style: toast) -->
+    <div id="notif-toast-container"></div>
+
+    <!-- Modal banner (popup-style: modal) -->
+    <div id="notif-modal-banner" class="hidden">
+        <div class="notif-banner-card">
+            <div class="notif-banner-icon" id="notif-banner-icon">&#9888;</div>
+            <div class="notif-banner-title" id="notif-banner-title">Alert</div>
+            <div class="notif-banner-body" id="notif-banner-body"></div>
+            <button id="notif-banner-ack" class="module-toggle start">Acknowledge</button>
+        </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="/aprs-symbols/aprs-symbols.js"></script>
     <script src="/js/app.js"></script>

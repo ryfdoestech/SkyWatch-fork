@@ -1324,6 +1324,61 @@ body {
     letter-spacing: 0.04em;
     margin-left: auto;
 }
+.target-popup-rename {
+    background: transparent;
+    color: var(--dw-text-secondary);
+    border: 1px solid var(--dw-divider);
+    border-radius: var(--radius-chip);
+    font-size: var(--fs-column);
+    font-weight: 600;
+    padding: 2px 8px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+.target-popup-rename:hover { color: var(--dw-text-primary); border-color: var(--dw-accent); }
+.target-popup-orig {
+    flex-basis: 100%;
+    margin-top: 4px;
+    font-size: var(--fs-column);
+    color: var(--dw-text-dim);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.target-popup-rename-input {
+    flex: 1;
+    min-width: 0;
+    background: var(--dw-bg);
+    border: 1px solid var(--dw-divider);
+    color: var(--dw-text-primary);
+    border-radius: var(--radius-input);
+    padding: 4px 8px;
+    font-size: var(--fs-meta);
+    font-weight: 600;
+    outline: none;
+}
+.target-popup-rename-input:focus { border-color: var(--dw-accent); }
+.target-popup-rename-save,
+.target-popup-rename-cancel {
+    background: transparent;
+    color: var(--dw-text-secondary);
+    border: 1px solid var(--dw-divider);
+    border-radius: var(--radius-chip);
+    font-size: var(--fs-column);
+    font-weight: 600;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.target-popup-rename-save:hover {
+    color: #fff;
+    background: var(--dw-accent);
+    border-color: var(--dw-accent);
+}
+.target-popup-rename-cancel:hover {
+    color: var(--chip-mil-a);
+    border-color: var(--chip-mil-a);
+}
 .target-popup-thumb {
     max-width: 100%;
     border-radius: var(--radius-input);
@@ -1413,6 +1468,300 @@ body {
     border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--dw-text-dim); }
+
+/* ──────────────────────────────────────────────────────────
+   Notifications — header badge, modals, toasts, banner
+   ────────────────────────────────────────────────────────── */
+
+/* Alerts counter chip — uses the warn accent so it reads as
+   actionable without being alarming when count is 0. */
+.badge.alerts {
+    background: var(--dw-accent-warn);
+    color: #2a1a00;
+    cursor: pointer;
+    border: 0;
+    font-weight: 700;
+}
+.badge.alerts:hover { filter: brightness(1.1); }
+.badge.alerts.has-unread {
+    animation: alerts-pulse 1.6s ease-in-out infinite;
+}
+@keyframes alerts-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 183, 77, 0.55); }
+    50%      { box-shadow: 0 0 0 6px rgba(255, 183, 77, 0); }
+}
+
+/* Modal shell — generalized from #setup-modal so both new modals reuse it */
+.modal-shell {
+    background: var(--dw-bg);
+    border: 1px solid var(--dw-divider);
+    border-radius: var(--radius-card);
+    width: 640px;
+    max-width: 95vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+
+#notif-overlay,
+#alert-log-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+#notif-overlay.hidden,
+#alert-log-overlay.hidden { display: none; }
+
+.modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--dw-text-secondary);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+.modal-close:hover { color: var(--dw-text-primary); }
+
+/* Notifications modal — rule rows */
+.dw-stack { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.notif-rule {
+    background: var(--dw-surface);
+    border: 1px solid var(--dw-divider);
+    border-radius: var(--radius-card);
+    padding: var(--sp-3);
+}
+.notif-rule-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+}
+.notif-rule-title {
+    font-weight: 700;
+    font-size: var(--fs-meta);
+    color: var(--dw-text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+.notif-rule-title .rule-chip {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+.notif-options {
+    display: flex;
+    gap: var(--sp-3);
+    flex-wrap: wrap;
+    margin-top: var(--sp-2);
+}
+.notif-options label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--fs-hint);
+    color: var(--dw-text-secondary);
+    cursor: pointer;
+}
+.notif-options input[type=checkbox] { cursor: pointer; }
+
+.notif-tails-row {
+    margin-top: var(--sp-2);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+}
+.notif-tails-row label {
+    font-size: var(--fs-hint);
+    color: var(--dw-text-secondary);
+    min-width: 110px;
+}
+.notif-tails-row input {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Popup-style radio rows */
+.notif-radio-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    cursor: pointer;
+    font-size: var(--fs-meta);
+    color: var(--dw-text-primary);
+    padding: 4px 0;
+}
+.notif-sub-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: 4px 0 8px 24px;
+    font-size: var(--fs-hint);
+    color: var(--dw-text-secondary);
+}
+.notif-num-input {
+    width: 64px;
+    flex: 0 0 64px;
+    text-align: right;
+}
+.notif-sub-row.disabled { opacity: 0.4; pointer-events: none; }
+
+/* Alert log list */
+.dw-empty {
+    text-align: center;
+    color: var(--dw-text-dim);
+    padding: var(--sp-6) var(--sp-3);
+    font-size: var(--fs-hint);
+}
+.alert-log-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px solid var(--dw-divider);
+    border-radius: var(--radius-input);
+    margin-bottom: var(--sp-1);
+    background: var(--dw-surface);
+    align-items: center;
+}
+.alert-log-item .rule-chip {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+}
+.alert-log-item .alert-body {
+    font-size: var(--fs-hint);
+    color: var(--dw-text-primary);
+}
+.alert-log-item .alert-body .alert-rule {
+    font-weight: 700;
+    margin-right: var(--sp-1);
+}
+.alert-log-item .alert-time {
+    font-size: var(--fs-column);
+    color: var(--dw-text-dim);
+    white-space: nowrap;
+}
+
+/* Toast container + individual toasts */
+#notif-toast-container {
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    pointer-events: none;
+    max-width: min(520px, 92vw);
+    width: 100%;
+}
+.toast-alert {
+    background: var(--dw-surface-high);
+    border: 1px solid var(--dw-divider);
+    border-left: 4px solid var(--dw-accent-warn);
+    border-radius: var(--radius-card);
+    padding: var(--sp-3) var(--sp-4);
+    color: var(--dw-text-primary);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    pointer-events: auto;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    animation: toast-in 0.22s ease-out;
+}
+.toast-alert.mil-airplane    { border-left-color: var(--chip-mil-a); }
+.toast-alert.mil-helicopter  { border-left-color: var(--chip-mil-h); }
+.toast-alert.tail-number     { border-left-color: var(--dw-accent); }
+.toast-alert.drone           { border-left-color: var(--chip-ua); }
+.toast-alert .toast-icon { font-size: 20px; line-height: 1; }
+.toast-alert .toast-body { flex: 1; min-width: 0; }
+.toast-alert .toast-title {
+    font-weight: 700;
+    font-size: var(--fs-meta);
+    margin-bottom: 2px;
+}
+.toast-alert .toast-detail {
+    font-size: var(--fs-hint);
+    color: var(--dw-text-secondary);
+    word-break: break-word;
+}
+.toast-alert.dismissing { animation: toast-out 0.18s ease-in forwards; }
+@keyframes toast-in {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes toast-out {
+    to { opacity: 0; transform: translateY(-10px); }
+}
+
+/* Modal banner (popup style: modal) — full-screen attention grab */
+#notif-modal-banner {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 3100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+#notif-modal-banner.hidden { display: none; }
+.notif-banner-card {
+    background: var(--dw-bg);
+    border: 1px solid var(--dw-divider);
+    border-top: 4px solid var(--dw-accent-warn);
+    border-radius: var(--radius-card);
+    padding: var(--sp-5) var(--sp-6);
+    width: 480px;
+    max-width: 92vw;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+.notif-banner-card.mil-airplane    { border-top-color: var(--chip-mil-a); }
+.notif-banner-card.mil-helicopter  { border-top-color: var(--chip-mil-h); }
+.notif-banner-card.tail-number     { border-top-color: var(--dw-accent); }
+.notif-banner-card.drone           { border-top-color: var(--chip-ua); }
+.notif-banner-icon {
+    font-size: 40px;
+    line-height: 1;
+    margin-bottom: var(--sp-2);
+    color: var(--dw-accent-warn);
+}
+.notif-banner-card.mil-airplane   .notif-banner-icon,
+.notif-banner-card.mil-helicopter .notif-banner-icon { color: var(--chip-mil-a); }
+.notif-banner-card.drone          .notif-banner-icon { color: var(--chip-ua); }
+.notif-banner-title {
+    font-size: var(--fs-details-hdr);
+    font-weight: 700;
+    color: var(--dw-text-primary);
+    margin-bottom: var(--sp-2);
+}
+.notif-banner-body {
+    font-size: var(--fs-body);
+    color: var(--dw-text-secondary);
+    margin-bottom: var(--sp-5);
+    word-break: break-word;
+    line-height: 1.45;
+}
+#notif-banner-ack { min-width: 160px; }
 
 /* ──────────────────────────────────────────────────────────
    Responsive

@@ -13,6 +13,25 @@
     let selectedId = null;
     let activeFilter = 'all';
     let ws = null;
+    // User-assigned display names for drones, keyed by stable target.id
+    // (e.g. 'DRONE-AABBCCDDEEFF'). Purely cosmetic — overrides the default
+    // callsign/drone_id/id label everywhere the drone is shown.
+    let droneAliases = (function() {
+        try {
+            var raw = localStorage.getItem('skywatch.droneAliases');
+            return raw ? (JSON.parse(raw) || {}) : {};
+        } catch (e) { return {}; }
+    })();
+    function saveDroneAliases() {
+        try { localStorage.setItem('skywatch.droneAliases', JSON.stringify(droneAliases)); } catch (e) {}
+    }
+    function displayLabel(t) {
+        if (t.type === 'drone' && droneAliases[t.id]) return droneAliases[t.id];
+        return t.callsign || t.ship_name || t.drone_id || t.id;
+    }
+    // While the user is mid-rename, suppress the WS-driven popup re-render
+    // for that target — otherwise every broadcast tick wipes the input.
+    let renamingId = null;
 
     // ── Map styles ──
     var MAP_STYLES = {
@@ -335,6 +354,7 @@
                 aprsMessages = [];
                 if (data.alert_zones) handleAlertZonesPayload(data.alert_zones);
                 if (data.alert_events) handleAlertEventsPayload(data.alert_events);
+                scanForNotifications(targets);
                 updateAll();
             } catch(e) {
                 console.error('Parse error:', e);
@@ -400,7 +420,7 @@
             }
 
             // Tooltip
-            const label = t.callsign || t.ship_name || t.drone_id || t.id;
+            const label = displayLabel(t);
             markers[t.id].bindTooltip(label, {
                 permanent: false,
                 direction: 'top',
@@ -430,7 +450,7 @@
             });
 
             filtered.forEach(function(t) {
-                var name = t.callsign || t.ship_name || t.drone_id || t.id;
+                var name = displayLabel(t);
                 // For aircraft, show registration + type if available
                 var subline = '';
                 if (t.type === 'aircraft') {
@@ -624,9 +644,19 @@
     }
 
     function buildTargetPopupHTML(t) {
-        var title = t.callsign || t.ship_name || t.drone_id || t.id;
+        var title = displayLabel(t);
+        var renameBtn = '';
+        if (t.type === 'drone') {
+            renameBtn = ' <button class="target-popup-rename" data-rename-id="' +
+                escHtml(t.id) + '" title="Rename drone">Rename</button>';
+            if (droneAliases[t.id]) {
+                renameBtn += ' <span class="target-popup-orig" title="Original ID">' +
+                    escHtml(t.drone_id || t.id) + '</span>';
+            }
+        }
         var header = '<div class="target-popup-header">' +
-            escHtml(title) + ' <span class="target-popup-kind">' + escHtml(t.type) + '</span></div>';
+            escHtml(title) + ' <span class="target-popup-kind">' + escHtml(t.type) + '</span>' +
+            renameBtn + '</div>';
         var photoBlock = '';
         if (t.type === 'vessel' && t.ship_name) {
             var cached = vesselPhotoCache[t.ship_name];
@@ -662,7 +692,7 @@
         // to the marker. The side panel is reserved for APRS stations.
         if (!selectedId || !selectedId.startsWith('aprs-')) {
             panel.classList.add('hidden');
-            if (selectedId) {
+            if (selectedId && renamingId !== selectedId) {
                 var t = targets.find(function(x) { return x.id === selectedId; });
                 var m = markers[selectedId];
                 if (t && m && m.isPopupOpen && m.isPopupOpen()) {
@@ -2636,6 +2666,469 @@
 
     wireAlertControls();
     loadAlertZones();
+
+    // ══════════════════════════════════════
+    // Notifications
+    // ══════════════════════════════════════
+
+    var NOTIF_RULES_META = [
+        { id: 'mil-airplane',   label: 'Military Airplane',    chip: 'var(--chip-mil-a)', hasTails: false, icon: '✈' },
+        { id: 'mil-helicopter', label: 'Military Helicopter',  chip: 'var(--chip-mil-h)', hasTails: false, icon: '🚁' },
+        { id: 'tail-number',    label: 'Specific Tail Number', chip: 'var(--dw-accent)',  hasTails: true,  icon: '✈' },
+        { id: 'drone',          label: 'Drone',                chip: 'var(--chip-ua)',    hasTails: false, icon: '⬣' }
+    ];
+
+    var DEFAULT_NOTIF_CONFIG = {
+        popupStyle: 'toast',
+        toastDurationSec: 10,
+        rules: {
+            'mil-airplane':   { popup: true,  audible: true,  silent: true,  tails: '' },
+            'mil-helicopter': { popup: true,  audible: true,  silent: true,  tails: '' },
+            'tail-number':    { popup: true,  audible: false, silent: true,  tails: '' },
+            'drone':          { popup: true,  audible: true,  silent: true,  tails: '' }
+        }
+    };
+
+    var notifCfg = loadNotifCfg();
+    var alertLog = loadAlertLog();
+    // Tracks (target.id + '|' + ruleId) combinations already alerted on this
+    // session so re-broadcasts of the same target don't spam. Lives in memory
+    // only — reloading the page intentionally re-arms alerts for everything
+    // currently airborne.
+    var alertedSet = new Set();
+    var modalBannerQueue = [];
+    var modalBannerActive = false;
+    var audioCtx = null;
+
+    function loadNotifCfg() {
+        try {
+            var raw = localStorage.getItem('skywatch.notifConfig');
+            if (raw) {
+                var parsed = JSON.parse(raw);
+                var out = JSON.parse(JSON.stringify(DEFAULT_NOTIF_CONFIG));
+                if (parsed.popupStyle) out.popupStyle = parsed.popupStyle;
+                if (parsed.toastDurationSec) out.toastDurationSec = parsed.toastDurationSec;
+                if (parsed.rules) {
+                    Object.keys(parsed.rules).forEach(function(rid) {
+                        if (out.rules[rid]) {
+                            Object.keys(parsed.rules[rid]).forEach(function(k) {
+                                out.rules[rid][k] = parsed.rules[rid][k];
+                            });
+                        }
+                    });
+                }
+                return out;
+            }
+        } catch (e) {}
+        return JSON.parse(JSON.stringify(DEFAULT_NOTIF_CONFIG));
+    }
+    function saveNotifCfg() {
+        try { localStorage.setItem('skywatch.notifConfig', JSON.stringify(notifCfg)); } catch (e) {}
+    }
+    function loadAlertLog() {
+        try {
+            var raw = localStorage.getItem('skywatch.alertLog');
+            if (raw) return JSON.parse(raw) || [];
+        } catch (e) {}
+        return [];
+    }
+    function saveAlertLog() {
+        try { localStorage.setItem('skywatch.alertLog', JSON.stringify(alertLog.slice(0, 500))); } catch (e) {}
+    }
+
+    function parseTailList(s) {
+        return (s || '')
+            .split(',')
+            .map(function(x) { return x.trim().toUpperCase(); })
+            .filter(function(x) { return x.length > 0; });
+    }
+
+    function ruleMeta(id) {
+        for (var i = 0; i < NOTIF_RULES_META.length; i++) {
+            if (NOTIF_RULES_META[i].id === id) return NOTIF_RULES_META[i];
+        }
+        return null;
+    }
+
+    function matchRules(t) {
+        var out = [];
+        if (t.type === 'aircraft' && t.category === 'military') out.push('mil-airplane');
+        if (t.type === 'aircraft' && t.category === 'mil-helo') out.push('mil-helicopter');
+        if (t.type === 'aircraft' && t.registration) {
+            var tails = parseTailList(notifCfg.rules['tail-number'].tails);
+            if (tails.indexOf(String(t.registration).toUpperCase()) >= 0) {
+                out.push('tail-number');
+            }
+        }
+        if (t.type === 'drone') out.push('drone');
+        return out;
+    }
+
+    function targetLabel(t) {
+        if (t.type === 'drone' && droneAliases[t.id]) return droneAliases[t.id];
+        return t.callsign || t.registration || t.drone_id || t.id;
+    }
+
+    function scanForNotifications(currentTargets) {
+        currentTargets.forEach(function(t) {
+            var ruleIds = matchRules(t);
+            ruleIds.forEach(function(rid) {
+                var key = t.id + '|' + rid;
+                if (alertedSet.has(key)) return;
+                var ruleCfg = notifCfg.rules[rid];
+                if (!ruleCfg) return;
+                if (!ruleCfg.popup && !ruleCfg.audible && !ruleCfg.silent) return;
+                alertedSet.add(key);
+                fireAlert(rid, t);
+            });
+        });
+    }
+
+    function fireAlert(rid, t) {
+        var ruleCfg = notifCfg.rules[rid];
+        var meta = ruleMeta(rid);
+        if (!meta) return;
+        var detail = '';
+        if (t.type === 'aircraft') {
+            var parts = [];
+            if (t.registration && t.callsign && t.registration !== t.callsign) parts.push(t.registration);
+            if (t.aircraft_type) parts.push(t.aircraft_type);
+            else if (t.typecode) parts.push(t.typecode);
+            detail = parts.join(' — ');
+        } else if (t.type === 'drone') {
+            detail = t.operator || t.drone_id || '';
+        }
+        var record = {
+            ts: Date.now(),
+            ruleId: rid,
+            ruleLabel: meta.label,
+            targetId: t.id,
+            targetType: t.type,
+            label: targetLabel(t),
+            detail: detail
+        };
+        if (ruleCfg.silent) {
+            alertLog.unshift(record);
+            if (alertLog.length > 500) alertLog.length = 500;
+            saveAlertLog();
+            updateAlertsCounter();
+            if (!document.getElementById('alert-log-overlay').classList.contains('hidden')) {
+                renderAlertLog();
+            }
+        }
+        if (ruleCfg.audible) playAlertBeep(rid);
+        if (ruleCfg.popup) {
+            if (notifCfg.popupStyle === 'modal') queueModalBanner(record);
+            else showToast(record);
+        }
+    }
+
+    function playAlertBeep(rid) {
+        try {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            // Per-rule pitches so the user can tell rules apart by ear.
+            var pitch = 880;
+            if (rid === 'mil-airplane')   pitch = 1100;
+            if (rid === 'mil-helicopter') pitch = 720;
+            if (rid === 'tail-number')    pitch = 880;
+            if (rid === 'drone')          pitch = 540;
+            var t0 = audioCtx.currentTime;
+            [pitch, pitch * 1.5].forEach(function(freq, i) {
+                var osc = audioCtx.createOscillator();
+                var gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.0001, t0 + i * 0.18);
+                gain.gain.exponentialRampToValueAtTime(0.25, t0 + i * 0.18 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.18 + 0.15);
+                osc.connect(gain).connect(audioCtx.destination);
+                osc.start(t0 + i * 0.18);
+                osc.stop(t0 + i * 0.18 + 0.18);
+            });
+        } catch (e) {
+            // Autoplay blocked until first user gesture — browser will allow
+            // beeps once the user clicks anywhere on the page.
+        }
+    }
+
+    function showToast(record) {
+        var c = document.getElementById('notif-toast-container');
+        if (!c) return;
+        var el = document.createElement('div');
+        el.className = 'toast-alert ' + record.ruleId;
+        var meta = ruleMeta(record.ruleId) || {};
+        el.innerHTML =
+            '<div class="toast-icon">' + (meta.icon || '!') + '</div>' +
+            '<div class="toast-body">' +
+                '<div class="toast-title">' + escHtml(record.ruleLabel) + ': ' + escHtml(record.label) + '</div>' +
+                (record.detail ? '<div class="toast-detail">' + escHtml(record.detail) + '</div>' : '') +
+            '</div>';
+        var dismissed = false;
+        var dismiss = function() {
+            if (dismissed) return;
+            dismissed = true;
+            el.classList.add('dismissing');
+            setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 220);
+        };
+        el.addEventListener('click', dismiss);
+        c.appendChild(el);
+        var ms = Math.max(1, parseFloat(notifCfg.toastDurationSec) || 10) * 1000;
+        setTimeout(dismiss, ms);
+    }
+
+    function queueModalBanner(record) {
+        modalBannerQueue.push(record);
+        if (!modalBannerActive) showNextModalBanner();
+    }
+    function showNextModalBanner() {
+        if (modalBannerQueue.length === 0) {
+            modalBannerActive = false;
+            document.getElementById('notif-modal-banner').classList.add('hidden');
+            return;
+        }
+        modalBannerActive = true;
+        var record = modalBannerQueue.shift();
+        var card = document.querySelector('#notif-modal-banner .notif-banner-card');
+        card.className = 'notif-banner-card ' + record.ruleId;
+        var meta = ruleMeta(record.ruleId) || {};
+        document.getElementById('notif-banner-icon').innerHTML = meta.icon || '!';
+        document.getElementById('notif-banner-title').textContent = record.ruleLabel + ' detected';
+        document.getElementById('notif-banner-body').textContent =
+            record.label + (record.detail ? ' — ' + record.detail : '');
+        document.getElementById('notif-modal-banner').classList.remove('hidden');
+    }
+
+    function updateAlertsCounter() {
+        var el = document.getElementById('alerts-count');
+        if (!el) return;
+        el.textContent = 'Alerts: ' + alertLog.length;
+        el.classList.toggle('has-unread', alertLog.length > 0);
+    }
+
+    function renderNotifModal() {
+        var radios = document.querySelectorAll('input[name="notif-popup-style"]');
+        radios.forEach(function(r) { r.checked = (r.value === notifCfg.popupStyle); });
+        document.getElementById('notif-toast-duration').value = notifCfg.toastDurationSec;
+        document.getElementById('notif-toast-duration-row').classList.toggle('disabled',
+            notifCfg.popupStyle !== 'toast');
+
+        var rulesEl = document.getElementById('notif-rules');
+        rulesEl.innerHTML = '';
+        NOTIF_RULES_META.forEach(function(meta) {
+            var cfg = notifCfg.rules[meta.id];
+            var card = document.createElement('div');
+            card.className = 'notif-rule';
+            var html =
+                '<div class="notif-rule-header">' +
+                    '<div class="notif-rule-title">' +
+                        '<span class="rule-chip" style="background:' + meta.chip + '"></span>' +
+                        escHtml(meta.label) +
+                    '</div>' +
+                '</div>' +
+                '<div class="notif-options">' +
+                    '<label><input type="checkbox" data-rule="' + meta.id + '" data-opt="popup"' + (cfg.popup ? ' checked' : '') + '/> Popup</label>' +
+                    '<label><input type="checkbox" data-rule="' + meta.id + '" data-opt="audible"' + (cfg.audible ? ' checked' : '') + '/> Audible</label>' +
+                    '<label><input type="checkbox" data-rule="' + meta.id + '" data-opt="silent"' + (cfg.silent ? ' checked' : '') + '/> Silent (log only)</label>' +
+                '</div>';
+            if (meta.hasTails) {
+                html += '<div class="notif-tails-row">' +
+                    '<label>Tail numbers</label>' +
+                    '<input type="text" class="tx-input" data-rule="' + meta.id + '" data-opt="tails" placeholder="N123AB, N456CD" value="' + escHtml(cfg.tails || '') + '"/>' +
+                '</div>';
+            }
+            card.innerHTML = html;
+            rulesEl.appendChild(card);
+        });
+    }
+
+    function renderAlertLog() {
+        var listEl = document.getElementById('alert-log-list');
+        var emptyEl = document.getElementById('alert-log-empty');
+        if (alertLog.length === 0) {
+            listEl.innerHTML = '';
+            emptyEl.classList.remove('hidden');
+            return;
+        }
+        emptyEl.classList.add('hidden');
+        var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+        var html = '';
+        alertLog.forEach(function(r) {
+            var meta = ruleMeta(r.ruleId) || {};
+            var d = new Date(r.ts);
+            var time = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+                ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+            html += '<div class="alert-log-item">' +
+                '<span class="rule-chip" style="background:' + (meta.chip || 'var(--dw-accent)') + '"></span>' +
+                '<div class="alert-body">' +
+                    '<span class="alert-rule">' + escHtml(r.ruleLabel) + ':</span> ' +
+                    escHtml(r.label) +
+                    (r.detail ? ' — <span style="color:var(--dw-text-secondary)">' + escHtml(r.detail) + '</span>' : '') +
+                '</div>' +
+                '<div class="alert-time">' + time + '</div>' +
+            '</div>';
+        });
+        listEl.innerHTML = html;
+    }
+
+    function wireNotifications() {
+        document.getElementById('notif-btn').addEventListener('click', function() {
+            renderNotifModal();
+            document.getElementById('notif-overlay').classList.remove('hidden');
+        });
+        document.querySelectorAll('[data-close]').forEach(function(b) {
+            b.addEventListener('click', function() {
+                var id = b.getAttribute('data-close');
+                var el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+        });
+        document.getElementById('notif-overlay').addEventListener('click', function(e) {
+            if (e.target === this) this.classList.add('hidden');
+        });
+        document.getElementById('alert-log-overlay').addEventListener('click', function(e) {
+            if (e.target === this) this.classList.add('hidden');
+        });
+
+        // Settings change handlers (event delegation over the modal body).
+        document.getElementById('notif-overlay').addEventListener('change', function(e) {
+            var t = e.target;
+            if (t.name === 'notif-popup-style') {
+                notifCfg.popupStyle = t.value;
+                document.getElementById('notif-toast-duration-row').classList.toggle('disabled',
+                    notifCfg.popupStyle !== 'toast');
+                saveNotifCfg();
+                return;
+            }
+            if (t.id === 'notif-toast-duration') {
+                var v = parseFloat(t.value);
+                if (!isNaN(v) && v > 0 && v <= 120) {
+                    notifCfg.toastDurationSec = v;
+                    saveNotifCfg();
+                }
+                return;
+            }
+            var rid = t.getAttribute && t.getAttribute('data-rule');
+            var opt = t.getAttribute && t.getAttribute('data-opt');
+            if (!rid || !opt) return;
+            var ruleCfg = notifCfg.rules[rid];
+            if (!ruleCfg) return;
+            if (opt === 'tails') {
+                ruleCfg.tails = t.value;
+                // Reset alerted-set for tail rule so newly-listed tails fire on
+                // their next observation.
+                Array.from(alertedSet).forEach(function(k) {
+                    if (k.indexOf('|tail-number') > 0) alertedSet.delete(k);
+                });
+            } else {
+                ruleCfg[opt] = t.checked;
+            }
+            saveNotifCfg();
+        });
+        // 'change' on a text input only fires on blur — capture typing too so
+        // the tail list is saved as the user edits it.
+        document.getElementById('notif-overlay').addEventListener('input', function(e) {
+            var t = e.target;
+            if (t.getAttribute && t.getAttribute('data-opt') === 'tails') {
+                var rid = t.getAttribute('data-rule');
+                var ruleCfg = notifCfg.rules[rid];
+                if (ruleCfg) {
+                    ruleCfg.tails = t.value;
+                    saveNotifCfg();
+                    Array.from(alertedSet).forEach(function(k) {
+                        if (k.indexOf('|tail-number') > 0) alertedSet.delete(k);
+                    });
+                }
+            }
+        });
+
+        document.getElementById('alerts-count').addEventListener('click', function() {
+            renderAlertLog();
+            document.getElementById('alert-log-overlay').classList.remove('hidden');
+        });
+        document.getElementById('alert-log-clear').addEventListener('click', function() {
+            alertLog = [];
+            saveAlertLog();
+            updateAlertsCounter();
+            renderAlertLog();
+        });
+        document.getElementById('notif-banner-ack').addEventListener('click', showNextModalBanner);
+    }
+
+    wireNotifications();
+    updateAlertsCounter();
+
+    // ── Drone rename (event-delegated on document because Leaflet popups
+    // rebuild their DOM on every setPopupContent and inline handlers don't
+    // survive the rewrite) ──
+    function beginRename(targetId) {
+        var t = targets.find(function(x) { return x.id === targetId; });
+        if (!t) return;
+        renamingId = targetId;
+        var m = markers[targetId];
+        if (!m || !m.isPopupOpen || !m.isPopupOpen()) return;
+        var headerEl = document.querySelector('.leaflet-popup-content .target-popup-header');
+        if (!headerEl) return;
+        var current = droneAliases[targetId] || '';
+        headerEl.innerHTML =
+            '<input type="text" class="target-popup-rename-input" placeholder="' +
+                escHtml(t.drone_id || t.id) + '" value="' + escHtml(current) + '"/>' +
+            ' <button class="target-popup-rename-save" data-rename-id="' + escHtml(targetId) + '">Save</button>' +
+            ' <button class="target-popup-rename-cancel" data-rename-id="' + escHtml(targetId) + '">Cancel</button>';
+        var input = headerEl.querySelector('.target-popup-rename-input');
+        if (input) {
+            input.focus();
+            input.select();
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') { e.preventDefault(); commitRename(targetId); }
+                else if (e.key === 'Escape') { e.preventDefault(); cancelRename(targetId); }
+            });
+        }
+    }
+    function commitRename(targetId) {
+        var headerEl = document.querySelector('.leaflet-popup-content .target-popup-header');
+        var val = '';
+        if (headerEl) {
+            var input = headerEl.querySelector('.target-popup-rename-input');
+            if (input) val = input.value.trim();
+        }
+        if (val) droneAliases[targetId] = val;
+        else delete droneAliases[targetId];  // empty input clears the alias
+        saveDroneAliases();
+        renamingId = null;
+        // Refresh everything that displays the name
+        var m = markers[targetId];
+        var t = targets.find(function(x) { return x.id === targetId; });
+        if (m && t && m.isPopupOpen && m.isPopupOpen()) {
+            m.setPopupContent(buildTargetPopupHTML(t));
+            // Tooltip cached label needs an update too
+            if (m.getTooltip()) m.setTooltipContent(displayLabel(t));
+        }
+        updateList();
+    }
+    function cancelRename(targetId) {
+        renamingId = null;
+        var m = markers[targetId];
+        var t = targets.find(function(x) { return x.id === targetId; });
+        if (m && t && m.isPopupOpen && m.isPopupOpen()) {
+            m.setPopupContent(buildTargetPopupHTML(t));
+        }
+    }
+    document.addEventListener('click', function(e) {
+        var t = e.target;
+        if (!t || !t.classList) return;
+        if (t.classList.contains('target-popup-rename')) {
+            e.stopPropagation();
+            beginRename(t.getAttribute('data-rename-id'));
+        } else if (t.classList.contains('target-popup-rename-save')) {
+            e.stopPropagation();
+            commitRename(t.getAttribute('data-rename-id'));
+        } else if (t.classList.contains('target-popup-rename-cancel')) {
+            e.stopPropagation();
+            cancelRename(t.getAttribute('data-rename-id'));
+        }
+    });
 
     // ── Public API ──
     window.skywatch.select = selectTarget;
