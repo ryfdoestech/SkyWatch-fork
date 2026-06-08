@@ -112,13 +112,6 @@ Two independent receive paths plus an internet TX path:
 
 </details>
 
-<details>
-<summary><strong>🛰️ NOAA Weather Satellites — backend only</strong></summary>
-
-- **Tracking:** SGP4 + Celestrak TLEs. Predicts NOAA-15 / 18 / 19 passes for your observer location.
-- **APT capture:** RTL-SDR + `rtl_fm` records the 137 MHz transmission, recovers sync, and renders the grayscale image. Geometric correction (Doppler / earth-curvature) is on the roadmap.
-
-</details>
 
 <details>
 <summary><strong>🌩️ NOAA Weather Radio + weather.gov — backend only</strong></summary>
